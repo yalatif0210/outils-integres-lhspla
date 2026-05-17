@@ -1,0 +1,1 @@
+ALTER TABLE "MissionRequest" ADD COLUMN IF NOT EXISTS "cancelledFromDraft" BOOLEAN NOT NULL DEFAULT false;

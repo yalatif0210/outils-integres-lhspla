@@ -1,0 +1,660 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  super_admin
+  admin_system
+  admin_finance
+  admin_tpm
+  chief_of_party
+  entity_member
+  assistant_direction
+  chargee_tresorerie
+}
+
+enum PaymentRequestStatus {
+  uploaded
+  validated
+  paid
+}
+
+enum PaymentAuditAction {
+  request_deleted
+  proof_deleted
+  proof_added
+  memo_created
+  memo_deleted
+  memo_approved
+  memo_rejected
+}
+
+enum MemoCategory {
+  rallonge_budgetaire
+  reduction_budgetaire
+  sans_incidence
+}
+
+enum MemoStatus {
+  pending_cop
+  approved
+  rejected
+}
+
+enum BudgetType {
+  ATELIER
+  ACHAT_FOURNITURES
+  MISSION_TERRAIN
+  APPUIS
+  CONTRACTUALISATION
+}
+
+enum BudgetStatus {
+  draft
+  submitted
+  finance_reviewed
+  tpm_approved
+  approved
+  rejected
+  archived
+  mission_cop
+}
+
+enum MissionStatus {
+  draft
+  pending_tpm
+  pending_cop
+  cop_approved
+  pending_dg
+  in_progress
+  completed
+  cancelled
+}
+
+enum RecallStatus {
+  open
+  closed
+  rejected
+  cancelled
+}
+
+enum RecallAction {
+  created
+  doc_added
+  doc_deleted
+  doc_approved
+  doc_rejected
+  closed
+  reopened
+  rejected
+  cancelled
+}
+
+enum WeekStatus {
+  active
+  closed
+}
+
+enum SubmissionStatus {
+  draft
+  submitted
+}
+
+enum CriticalityLevel {
+  critique
+  eleve
+  modere
+  faible
+}
+
+enum DosParticipation {
+  oui
+  non
+}
+
+enum SectionType {
+  A
+  B
+  C
+  D
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  firstName    String
+  lastName     String
+  roles        Role[]
+  entityCode   String?
+  phone        String?
+  isActive              Boolean  @default(true)
+  isEntityResponsible   Boolean  @default(false)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  notifications           Notification[]
+  sectionLocks            SectionLock[]
+  createdWeeks            Week[]           @relation("WeekCreatedBy")
+  submissions             EntitySubmission[] @relation("SubmittedBy")
+  financeReviewedBudgets  BudgetProject[]  @relation("BudgetFinanceReviewer")
+  tpmReviewedBudgets      BudgetProject[]  @relation("BudgetTPMReviewer")
+  reviewedBudgets         BudgetProject[]  @relation("BudgetCOPReviewer")
+  closedRecalls           BudgetRecall[]   @relation("RecallClosedBy")
+  recallAuditLogs         RecallAuditLog[]
+  initiatedMissions       MissionRequest[] @relation("MissionInitiator")
+  uploadedPaymentRequests PaymentRequest[] @relation("PRUploadedBy")
+  validatedPaymentRequests PaymentRequest[] @relation("PRValidatedBy")
+  uploadedProofs          PaymentProof[]   @relation("ProofUploadedBy")
+  uploadedTemplates       PaymentTemplate[] @relation("TemplateUploadedBy")
+  paymentAuditLogs        PaymentAuditLog[]
+  budgetMemos             BudgetMemo[]     @relation("MemoCreatedBy")
+  reviewedMemos           BudgetMemo[]     @relation("MemoReviewedBy")
+  tdrHistoryUploads       BudgetTdrHistory[] @relation("TdrHistoryUploadedBy")
+
+  @@index([entityCode])
+}
+
+model Week {
+  id            String     @id @default(uuid())
+  weekReference String
+  weekStart     DateTime
+  weekEnd       DateTime
+  status        WeekStatus @default(active)
+  createdBy     String
+  createdAt     DateTime   @default(now())
+  closedAt      DateTime?
+
+  creator     User               @relation("WeekCreatedBy", fields: [createdBy], references: [id])
+  submissions EntitySubmission[]
+
+  @@index([status])
+  @@index([weekStart])
+}
+
+model EntitySubmission {
+  id             String           @id @default(uuid())
+  weekId         String
+  entityCode     String
+  responsible    String           @default("")
+  submissionDate String           @default("")
+  status         SubmissionStatus @default(draft)
+  lastSavedAt    DateTime?
+  submittedAt    DateTime?
+  submittedById  String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  week              Week              @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  submittedBy       User?             @relation("SubmittedBy", fields: [submittedById], references: [id])
+  activities        Activity[]
+  plannedActivities PlannedActivity[]
+  riskPoints        RiskPoint[]
+  sectionLocks      SectionLock[]
+
+  @@unique([weekId, entityCode])
+  @@index([weekId])
+  @@index([entityCode])
+  @@index([status])
+}
+
+model Activity {
+  id              String           @id @default(uuid())
+  submissionId    String
+  orderIndex      Int
+  title           String           @default("")
+  objectives      String           @default("")
+  location        String           @default("")
+  dates           String           @default("")
+  startDate       DateTime?
+  endDate         DateTime?
+  recommendations String           @default("")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  submission EntitySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId, orderIndex])
+}
+
+model PlannedActivity {
+  id               String            @id @default(uuid())
+  submissionId     String
+  orderIndex       Int
+  title            String            @default("")
+  objectives       String            @default("")
+  location         String            @default("")
+  plannedDates     String            @default("")
+  startDate        DateTime?
+  endDate          DateTime?
+  dosParticipation DosParticipation?
+  observations     String            @default("")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  submission EntitySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+}
+
+model RiskPoint {
+  id             String            @id @default(uuid())
+  submissionId   String
+  orderIndex     Int
+  theme          String            @default("")
+  category       String            @default("")
+  description    String            @default("")
+  criticality    CriticalityLevel?
+  expectedAction String            @default("")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  submission EntitySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([criticality])
+}
+
+model SectionLock {
+  id           String      @id @default(uuid())
+  submissionId String
+  section      SectionType
+  lockedById   String
+  lockedAt     DateTime    @default(now())
+  expiresAt    DateTime
+
+  submission EntitySubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  lockedBy   User             @relation(fields: [lockedById], references: [id])
+
+  @@unique([submissionId, section])
+  @@index([expiresAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model FinancingFund {
+  id        String          @id @default(uuid())
+  name      String          @unique
+  code      String          @unique
+  isActive  Boolean         @default(true)
+  order     Int             @default(0)
+  budgets   BudgetProject[]
+  missions  MissionRequest[]
+}
+
+// Grille de coûts de référence
+model CostItem {
+  id           String       @id @default(uuid())
+  nature       String
+  designation  String
+  unitCost     Float
+  justificatif String       @default("")
+  isActive     Boolean      @default(true)
+  order        Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  lines BudgetLine[]
+
+  @@index([nature, isActive])
+}
+
+model BudgetProject {
+  id                  String        @id @default(uuid())
+  entityCode          String
+  budgetType          BudgetType
+  title               String
+  fundId              String
+  activityReferenceId String?
+  exchangeRate        Float         @default(655)
+  transferFeeRate     Float         @default(0.05)
+  totalAmount         Float         @default(0)
+  status              BudgetStatus  @default(draft)
+  rejectionReason     String?
+  rejectedAt          DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  submittedAt         DateTime?
+  tpmReviewedAt       DateTime?
+  tpmReviewedById     String?
+  reviewedAt          DateTime?
+  reviewedById        String?
+  tdrFilePath         String?
+  tdrFileExt          String?
+  budgetNumber        String?       @unique
+  financeReviewedAt   DateTime?
+  financeReviewedById String?
+
+  fund              FinancingFund      @relation(fields: [fundId], references: [id])
+  activityReference ActivityReference? @relation(fields: [activityReferenceId], references: [id])
+  financeReviewedBy User?              @relation("BudgetFinanceReviewer", fields: [financeReviewedById], references: [id])
+  tpmReviewedBy     User?              @relation("BudgetTPMReviewer", fields: [tpmReviewedById], references: [id])
+  reviewedBy        User?              @relation("BudgetCOPReviewer", fields: [reviewedById], references: [id])
+  lines             BudgetLine[]
+  recalls           BudgetRecall[]
+  missions          MissionRequest[]
+  paymentRequests   PaymentRequest[]
+  memos             BudgetMemo[]
+  tdrHistory        BudgetTdrHistory[]
+
+  @@index([entityCode, budgetType])
+  @@index([status])
+  @@index([fundId])
+}
+
+model BudgetLine {
+  id          String    @id @default(uuid())
+  budgetId    String
+  rowKey      String
+  costItemId  String?
+  designation String    @default("")
+  unitCost    Float?
+  quantity    Float?
+  frequency   Float?
+  updatedAt   DateTime  @updatedAt
+
+  budget          BudgetProject  @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  costItem        CostItem?      @relation(fields: [costItemId], references: [id])
+  recallDocuments RecallDocument[]
+
+  @@unique([budgetId, rowKey])
+  @@index([budgetId])
+}
+
+model AppConfig {
+  key       String   @id
+  value     String
+  label     String
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityReference {
+  id           String   @id @default(uuid())
+  entityCode   String
+  os           String   @default("")
+  oo           String   @default("")
+  activityCode String   @default("")
+  taskId       String   @default("")
+  title        String
+  isActive     Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  budgets  BudgetProject[]
+  missions MissionRequest[]
+
+  @@index([entityCode, isActive])
+}
+
+model RiskTheme {
+  id         String         @id @default(uuid())
+  name       String         @unique
+  isActive   Boolean        @default(true)
+  order      Int            @default(0)
+  categories RiskCategory[]
+}
+
+model RiskCategory {
+  id       String     @id @default(uuid())
+  name     String     @unique
+  isActive Boolean    @default(true)
+  order    Int        @default(0)
+  themeId  String?
+  theme    RiskTheme? @relation(fields: [themeId], references: [id], onDelete: SetNull)
+
+  @@index([themeId])
+}
+
+model BudgetRecall {
+  id              String       @id @default(uuid())
+  budgetId        String
+  entityCode      String
+  reason          String
+  status          RecallStatus @default(open)
+  rejectionReason String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  closedAt        DateTime?
+  closedById      String?
+  cancelledAt     DateTime?
+
+  budget    BudgetProject    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  closedBy  User?            @relation("RecallClosedBy", fields: [closedById], references: [id])
+  documents RecallDocument[]
+  auditLogs RecallAuditLog[]
+
+  @@index([budgetId])
+  @@index([entityCode, status])
+}
+
+model RecallDocument {
+  id            String    @id @default(uuid())
+  recallId      String
+  budgetLineId  String
+  name          String
+  description   String    @default("")
+  filePath      String
+  fileName      String
+  fileType      String
+  fileSize      Int
+  addedAt       DateTime  @default(now())
+  docStatus     String    @default("pending")
+  rejectionNote String?
+  reviewedAt    DateTime?
+  reviewedById  String?
+
+  recall     BudgetRecall @relation(fields: [recallId], references: [id], onDelete: Cascade)
+  budgetLine BudgetLine   @relation(fields: [budgetLineId], references: [id])
+
+  @@index([recallId])
+  @@index([budgetLineId])
+}
+
+model RecallAuditLog {
+  id        String       @id @default(uuid())
+  recallId  String
+  userId    String
+  action    RecallAction
+  detail    String       @default("")
+  createdAt DateTime     @default(now())
+
+  recall BudgetRecall @relation(fields: [recallId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id])
+
+  @@index([recallId])
+}
+
+// ─── Module Demandes de Mission / ODM ────────────────────────────────────────
+
+model Personnel {
+  id         String   @id @default(uuid())
+  fullName   String
+  service    String
+  function   String
+  waveNumber String?
+  email      String?
+  isActive   Boolean  @default(true)
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  missionParticipants MissionParticipant[]
+
+  @@index([service, isActive])
+}
+
+model MissionRequest {
+  id              String        @id @default(uuid())
+  initiatorId     String
+  budgetId        String?
+  activityRefId   String?
+  object          String
+  location        String
+  departureDate   DateTime
+  returnDate      DateTime
+  resumeDate      DateTime
+  fundId          String
+  requestDate            DateTime      @default(now())
+  status                 MissionStatus @default(draft)
+  rejectionReason        String?
+  transmittedAt          DateTime?
+  orderNumber            String?
+  dashboardObservations  String?
+  isInvitation           Boolean       @default(false)
+  cancelledFromDraft     Boolean       @default(false)
+  signedDocPath          String?
+  signedDocExt           String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  initiator    User               @relation("MissionInitiator", fields: [initiatorId], references: [id])
+  budget       BudgetProject?     @relation(fields: [budgetId], references: [id])
+  activityRef  ActivityReference? @relation(fields: [activityRefId], references: [id])
+  fund         FinancingFund      @relation(fields: [fundId], references: [id])
+  participants MissionParticipant[]
+
+  @@index([initiatorId])
+  @@index([status])
+  @@index([returnDate])
+  @@index([fundId])
+}
+
+model MissionParticipant {
+  id          String @id @default(uuid())
+  missionId   String
+  personnelId String
+
+  mission   MissionRequest @relation(fields: [missionId], references: [id], onDelete: Cascade)
+  personnel Personnel      @relation(fields: [personnelId], references: [id])
+
+  @@unique([missionId, personnelId])
+  @@index([missionId])
+}
+
+// ─── Module Demandes de Paiement ─────────────────────────────────────────────
+
+model PaymentRequest {
+  id              String               @id @default(uuid())
+  budgetId        String
+  entityCode      String
+  status          PaymentRequestStatus @default(uploaded)
+  filePath        String
+  fileName        String
+  rejectionReason String?
+  uploadedAt      DateTime             @default(now())
+  uploadedById    String
+  validatedAt     DateTime?
+  validatedById   String?
+  paidAt          DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  budget      BudgetProject    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  uploadedBy  User             @relation("PRUploadedBy", fields: [uploadedById], references: [id])
+  validatedBy User?            @relation("PRValidatedBy", fields: [validatedById], references: [id])
+  proofs      PaymentProof[]
+  auditLogs   PaymentAuditLog[]
+
+  @@index([budgetId])
+  @@index([entityCode, status])
+}
+
+model PaymentProof {
+  id               String   @id @default(uuid())
+  paymentRequestId String
+  filePath         String
+  fileName         String
+  fileType         String
+  amount           Float    @default(0)
+  uploadedAt       DateTime @default(now())
+  uploadedById     String
+
+  paymentRequest PaymentRequest @relation(fields: [paymentRequestId], references: [id], onDelete: Cascade)
+  uploadedBy     User           @relation("ProofUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([paymentRequestId])
+}
+
+model PaymentTemplate {
+  id           String   @id @default(uuid())
+  filePath     String
+  fileName     String
+  uploadedAt   DateTime @default(now())
+  uploadedById String
+
+  uploadedBy User @relation("TemplateUploadedBy", fields: [uploadedById], references: [id])
+}
+
+model BudgetMemo {
+  id               String       @id @default(uuid())
+  budgetId         String
+  category         MemoCategory
+  status           MemoStatus   @default(pending_cop)
+  amount           Float        @default(0)
+  content          String?
+  filePath         String?
+  fileName         String?
+  fileType         String?
+  rejectionReason  String?
+  reviewedAt       DateTime?
+  reviewedById     String?
+  createdAt        DateTime     @default(now())
+  createdById      String
+
+  budget     BudgetProject @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  createdBy  User          @relation("MemoCreatedBy", fields: [createdById], references: [id])
+  reviewedBy User?         @relation("MemoReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([budgetId])
+  @@index([status])
+}
+
+model BudgetTdrHistory {
+  id           String   @id @default(uuid())
+  budgetId     String
+  filePath     String
+  fileExt      String   @default("pdf")
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+  uploadedRole String   @default("")
+
+  budget     BudgetProject @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  uploadedBy User          @relation("TdrHistoryUploadedBy", fields: [uploadedById], references: [id])
+
+  @@index([budgetId])
+}
+
+model PaymentAuditLog {
+  id               String             @id @default(uuid())
+  paymentRequestId String?
+  proofId          String?
+  budgetId         String
+  userId           String
+  action           PaymentAuditAction
+  detail           String             @default("")
+  createdAt        DateTime           @default(now())
+
+  paymentRequest PaymentRequest? @relation(fields: [paymentRequestId], references: [id], onDelete: SetNull)
+  user           User            @relation(fields: [userId], references: [id])
+
+  @@index([paymentRequestId])
+  @@index([budgetId])
+}

@@ -1,0 +1,41 @@
+{
+  "name": "LHSPLA-TA — Outil Intégré",
+  "short_name": "LHSPLA-TA",
+  "description": "Bulletin hebdomadaire, budgets, missions et suivi des activités LHSPLA",
+  "theme_color": "#1F4E79",
+  "background_color": "#EEF2F7",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo_psp.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Missions",
+      "url": "/missions",
+      "description": "Demandes de mission"
+    },
+    {
+      "name": "Budgets",
+      "url": "/budgets",
+      "description": "Gestion des budgets"
+    },
+    {
+      "name": "Dashboard KPI",
+      "url": "/dashboard/kpi",
+      "description": "Tableau de bord KPI"
+    }
+  ]
+}

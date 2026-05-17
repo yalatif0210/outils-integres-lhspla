@@ -1,0 +1,65 @@
+{
+  "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "resources": {
+        "files": [
+          "/favicon.ico",
+          "/index.html",
+          "/manifest.webmanifest",
+          "/*.css",
+          "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "static-assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/logo_psp.png",
+          "/logo_usaid.png",
+          "/notification.mp3",
+          "/**/*.jpg",
+          "/**/*.png",
+          "/**/*.svg",
+          "/**/*.gif",
+          "/**/*.woff2",
+          "/**/*.woff"
+        ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "api-auth",
+      "urls": ["/api/auth/**"],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 5,
+        "maxAge": "1m",
+        "timeout": "5s"
+      }
+    },
+    {
+      "name": "api-read",
+      "urls": [
+        "/api/missions",
+        "/api/budget-projects",
+        "/api/notifications",
+        "/api/dashboard/**",
+        "/api/personnel"
+      ],
+      "cacheConfig": {
+        "strategy": "freshness",
+        "maxSize": 50,
+        "maxAge": "5m",
+        "timeout": "10s"
+      }
+    }
+  ]
+}

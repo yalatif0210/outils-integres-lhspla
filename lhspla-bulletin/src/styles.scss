@@ -1,0 +1,178 @@
+/* Global styles — LHSPLA Bulletin */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&display=swap');
+
+/* ─── CSS tokens ─────────────────────────────────────────────────────────── */
+:root {
+  --navy:      #1F4E79;
+  --navy-dark: #163d61;
+  --blue:      #2E75B6;
+  --red:       #C00000;
+  --red-dark:  #9E0000;
+  --bg:        #EEF2F7;
+  --card-bg:   #FFFFFF;
+  --border:    #E8EDF5;
+  --text:      #1a2340;
+  --text-muted:#667085;
+  --shadow-sm: 0 1px 4px rgba(31,78,121,0.06);
+  --shadow-md: 0 2px 12px rgba(31,78,121,0.10);
+  --shadow-lg: 0 8px 32px rgba(31,78,121,0.14);
+  --radius:    14px;
+  --radius-sm: 8px;
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: Inter, Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #f0f4f8; }
+::-webkit-scrollbar-thumb { background: #BDD7EE; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+/* ─── Material card override ────────────────────────────────────────────── */
+.mat-mdc-card {
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-md) !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card-bg) !important;
+}
+
+/* ─── Material button overrides — white text on colored backgrounds ──────── */
+.mat-mdc-raised-button.mat-primary  { background-color: var(--navy) !important; color: white !important; }
+.mat-mdc-raised-button.mat-accent   { background-color: var(--blue) !important; color: white !important; }
+.mat-mdc-raised-button.mat-warn     { background-color: var(--red)  !important; color: white !important; }
+.mat-mdc-unelevated-button.mat-primary { background-color: var(--navy) !important; color: white !important; }
+.mat-mdc-flat-button.mat-primary    { background-color: var(--navy) !important; color: white !important; }
+
+/* ─── Material form field ────────────────────────────────────────────────── */
+.mat-mdc-form-field.mat-focused .mat-mdc-floating-label { color: var(--navy) !important; }
+.mdc-text-field--outlined.mdc-text-field--focused .mdc-notched-outline__leading,
+.mdc-text-field--outlined.mdc-text-field--focused .mdc-notched-outline__notch,
+.mdc-text-field--outlined.mdc-text-field--focused .mdc-notched-outline__trailing {
+  border-color: var(--navy) !important;
+}
+
+/* ─── Material tabs ──────────────────────────────────────────────────────── */
+.mat-mdc-tab-header { border-bottom: 2px solid #DEEAF1; }
+.mat-mdc-tab.mdc-tab--active .mdc-tab__text-label { color: var(--navy) !important; }
+.mat-mdc-tab-indicator__content--underline { border-color: var(--navy) !important; }
+
+/* ─── Triband decorative stripe ──────────────────────────────────────────── */
+.triband {
+  height: 5px;
+  background: linear-gradient(to right, var(--navy) 33.33%, white 33.33% 66.66%, var(--red) 66.66%);
+}
+
+/* ─── Page header pattern ────────────────────────────────────────────────── */
+.lhs-page-header {
+  background: linear-gradient(150deg, var(--navy-dark) 0%, var(--navy) 60%, #245d8f 100%);
+  color: white;
+  padding: 28px 32px 22px;
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+.lhs-page-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(to right, var(--blue) 33.33%, white 33.33% 66.66%, var(--red) 66.66%);
+}
+.lhs-page-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: .3px;
+}
+.lhs-page-header p {
+  margin: 0;
+  font-size: 13px;
+  opacity: .75;
+}
+
+/* ─── Section title ──────────────────────────────────────────────────────── */
+.lhs-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--navy);
+  margin: 24px 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.lhs-section-title mat-icon { color: var(--blue); font-size: 20px; width: 20px; height: 20px; }
+
+/* ─── Count badge ────────────────────────────────────────────────────────── */
+.count-badge {
+  background: #DEEAF1;
+  color: var(--navy);
+  padding: 1px 9px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ─── Snackbar ───────────────────────────────────────────────────────────── */
+.snack-success .mdc-snackbar__surface { background: #276221 !important; color: white !important; }
+
+/* ─── Participants panel (mat-select multiple) ───────────────────────────── */
+.participants-panel .mat-mdc-option {
+  height: auto !important;
+  min-height: 48px;
+  padding: 8px 16px !important;
+  border-bottom: 1px solid #f0f4f8;
+}
+.participants-panel .mat-mdc-option:last-child { border-bottom: none; }
+.participants-panel .mat-mdc-option .mdc-list-item__primary-text { width: 100%; }
+
+/* ─── Print ──────────────────────────────────────────────────────────────── */
+@media print {
+  app-navbar { display: none !important; }
+  .main-content { background: white !important; }
+  body { background: white !important; }
+  mat-tab-body:not(.mat-tab-body-active) { display: none; }
+}
+
+/* ─── Responsive mobile ──────────────────────────────────────────────────── */
+@media (max-width: 840px) {
+  /* Page headers */
+  .lhs-page-header {
+    padding: 16px 16px 14px;
+    border-radius: 0 !important;
+    margin-bottom: 12px;
+  }
+  .lhs-page-header h1 { font-size: 17px; }
+
+  /* Cards et grilles */
+  .mat-mdc-card { border-radius: 10px !important; }
+
+  /* Tables horizontalement scrollables */
+  .mat-mdc-table-container, table[mat-table] {
+    overflow-x: auto;
+    display: block;
+    width: 100%;
+  }
+
+  /* Formulaires pleine largeur */
+  .mat-mdc-form-field { width: 100% !important; }
+
+  /* Dialogues plein écran */
+  .cdk-overlay-pane {
+    max-width: 98vw !important;
+  }
+
+  /* Contenu principal avec padding réduit */
+  .main-content > * {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+}
