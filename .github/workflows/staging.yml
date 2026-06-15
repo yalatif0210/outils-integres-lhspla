@@ -134,11 +134,16 @@ jobs:
 
       - name: Health check staging (port 8080)
         run: |
-          sleep 15
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            http://vps.lhspla-ci.org:8080/api/health || echo "000")
-          echo "Staging health: HTTP $STATUS"
-          [ "$STATUS" = "200" ] || exit 1
+          echo "Attente démarrage API staging (max 2 min)..."
+          for i in $(seq 1 24); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              http://vps.lhspla-ci.org:8080/api/health 2>/dev/null || echo "000")
+            echo "Tentative $i/24 — HTTP $STATUS"
+            [ "$STATUS" = "200" ] && { echo "✅ Staging opérationnel"; exit 0; }
+            sleep 5
+          done
+          echo "❌ Staging non disponible après 2 minutes"
+          exit 1
 
   # ── Promote develop → main ──────────────────────────────────────────────────
   promote:
