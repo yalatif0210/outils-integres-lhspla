@@ -7,8 +7,8 @@ on:
 env:
   REGISTRY: ghcr.io
   APP_DIR: /home/markov/lhspla
-  API_IMAGE: ghcr.io/${{ github.repository_owner }}/lhspla-api
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/lhspla-frontend
+  API_IMAGE: ghcr.io/${{ github.repository }}/lhspla-api
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/lhspla-frontend
 
 jobs:
   # ── Build & Push images ─────────────────────────────────────────────────────
