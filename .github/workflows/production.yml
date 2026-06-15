@@ -17,7 +17,6 @@ jobs:
     steps:
       - name: Health check staging (port 8080)
         run: |
-          echo "Vérification que le staging est sain..."
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             http://vps.lhspla-ci.org:8080/api/health || echo "000")
           echo "Staging: HTTP $STATUS"
@@ -87,6 +86,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Écrire .env.prod sur le VPS depuis les secrets GitHub
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > /home/markov/.env.prod << 'EOF'
+            GITHUB_REPOSITORY=${{ github.repository }}
+            PROD_DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
+            PROD_JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
+            PROD_JWT_REFRESH_SECRET=${{ secrets.PROD_JWT_REFRESH_SECRET }}
+            MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            PGADMIN_EMAIL=admin@lhspla.ci
+            PGADMIN_PASSWORD=${{ secrets.PGADMIN_PASSWORD }}
+            N8N_USER=admin
+            N8N_PASSWORD=${{ secrets.N8N_PASSWORD }}
+            MAIL_HOST=smtp.gmail.com
+            MAIL_PORT=587
+            MAIL_USER=
+            MAIL_PASS=
+            MAIL_FROM=LHSPLA <noreply@lhspla.ci>
+            EOF
+            chmod 600 /home/markov/.env.prod
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -97,20 +122,11 @@ jobs:
             set -e
             cd /home/markov
 
-            # Mettre à jour le code de déploiement
-            git -C /home/markov pull origin main 2>/dev/null || true
+            # Pull images et démarrage
+            docker compose -f docker-compose.prod.yml --env-file .env.prod pull
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
 
-            # Injecter GITHUB_REPOSITORY
-            export GITHUB_REPOSITORY="${{ github.repository }}"
-            echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY" > /tmp/ci-prod.env
-            cat .env.prod >> /tmp/ci-prod.env
-
-            # Deploy
-            docker compose -f docker-compose.prod.yml --env-file /tmp/ci-prod.env pull
-            docker compose -f docker-compose.prod.yml --env-file /tmp/ci-prod.env up -d --remove-orphans
-            rm /tmp/ci-prod.env
-
-            # Seed (idempotent)
+            # Seed idempotent
             sleep 10
             docker exec prod-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
 
@@ -122,11 +138,6 @@ jobs:
           echo "Production health: HTTP $STATUS"
           [ "$STATUS" = "200" ] || exit 1
 
-      - name: Notification déploiement réussi
-        if: success()
-        run: |
-          echo "✅ Production déployée avec succès — commit ${{ github.sha }}"
-
       - name: Rollback si échec
         if: failure()
         uses: appleboy/ssh-action@v1.0.3
@@ -135,6 +146,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "❌ Déploiement échoué — rollback vers l'image précédente..."
+            echo "❌ Déploiement échoué — rollback..."
             cd /home/markov
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-build || true
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d || true

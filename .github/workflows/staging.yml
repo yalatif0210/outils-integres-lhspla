@@ -67,6 +67,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Écrire .env.staging sur le VPS depuis les secrets GitHub
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > /home/markov/.env.staging << 'EOF'
+            GITHUB_REPOSITORY=${{ github.repository }}
+            STG_DB_PASSWORD=${{ secrets.STG_DB_PASSWORD }}
+            STG_JWT_SECRET=${{ secrets.STG_JWT_SECRET }}
+            STG_JWT_REFRESH_SECRET=${{ secrets.STG_JWT_REFRESH_SECRET }}
+            MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            MAIL_HOST=smtp.gmail.com
+            MAIL_PORT=587
+            MAIL_USER=
+            MAIL_PASS=
+            MAIL_FROM=LHSPLA Staging <noreply@lhspla.ci>
+            EOF
+            chmod 600 /home/markov/.env.staging
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -77,20 +99,11 @@ jobs:
             set -e
             cd /home/markov
 
-            # Mettre à jour le code de déploiement
-            git -C /home/markov pull origin develop 2>/dev/null || true
+            # Pull images et démarrage
+            docker compose -f docker-compose.staging.yml --env-file .env.staging pull
+            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --remove-orphans
 
-            # Injecter GITHUB_REPOSITORY dans l'env staging
-            export GITHUB_REPOSITORY="${{ github.repository }}"
-            echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY" > /tmp/ci-staging.env
-            cat .env.staging >> /tmp/ci-staging.env
-
-            # Deploy
-            docker compose -f docker-compose.staging.yml --env-file /tmp/ci-staging.env pull
-            docker compose -f docker-compose.staging.yml --env-file /tmp/ci-staging.env up -d --remove-orphans
-            rm /tmp/ci-staging.env
-
-            # Seed (idempotent)
+            # Seed idempotent
             sleep 8
             docker exec stg-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
 
