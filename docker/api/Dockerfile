@@ -9,7 +9,7 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY lhspla-api/package*.json ./
-RUN npm ci --include=dev
+RUN npm ci --include=dev --legacy-peer-deps
 
 COPY lhspla-api/ .
 RUN npx prisma generate

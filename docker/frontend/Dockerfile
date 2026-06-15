@@ -4,7 +4,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY lhspla-bulletin/package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY lhspla-bulletin/ .
 RUN npm run build -- --configuration=production
