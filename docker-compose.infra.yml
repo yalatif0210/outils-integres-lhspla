@@ -1,29 +1,5 @@
 services:
 
-  # ── Reverse proxy SSL prod ────────────────────────────────────────────────────
-  nginx:
-    image: nginx:1.25-alpine
-    container_name: lhspla-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - certbot-certs:/etc/letsencrypt:ro
-      - certbot-www:/var/www/certbot:ro
-    networks:
-      - lhspla-prod-net
-
-  # ── Certbot renouvellement automatique ───────────────────────────────────────
-  certbot:
-    image: certbot/certbot:latest
-    container_name: lhspla-certbot
-    volumes:
-      - certbot-certs:/etc/letsencrypt
-      - certbot-www:/var/www/certbot
-    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
-
   # ── Portainer — port 9000 ─────────────────────────────────────────────────────
   portainer:
     image: portainer/portainer-ce:latest
@@ -81,8 +57,6 @@ networks:
     external: true
 
 volumes:
-  certbot-certs:
-  certbot-www:
   portainer-data:
   pgadmin-data:
   n8n-data:
