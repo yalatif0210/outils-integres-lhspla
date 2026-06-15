@@ -1,6 +1,11 @@
 # ── Stage 1: Build NestJS ────────────────────────────────────────────────────
 FROM node:20-slim AS builder
 
+# Outils de compilation requis par bcrypt (node-gyp)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY lhspla-api/package*.json ./
