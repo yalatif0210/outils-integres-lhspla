@@ -60,7 +60,8 @@ EOF
   ln -sf /etc/nginx/sites-available/lhspla /etc/nginx/sites-enabled/lhspla
   # Pas besoin de retirer le vhost default : nginx route par server_name,
   # les autres domaines du VPS restent inchangés.
-  nginx -t && systemctl reload nginx
+  nginx -t
+systemctl reload nginx
   echo "✅ Vhost HTTP lhspla activé"
 else
   echo "✅ Vhost lhspla déjà activé dans sites-enabled"
@@ -96,7 +97,8 @@ fi
 # ── 5. Config nginx HTTPS (proxy → prod-frontend 127.0.0.1:8090) ─────────────
 echo "▶ Déploiement config nginx HTTPS..."
 cp "$APP_DIR/docker/nginx-system/lhspla.conf" /etc/nginx/sites-available/lhspla
-nginx -t && systemctl reload nginx
+nginx -t
+systemctl reload nginx
 echo "✅ Nginx HTTPS actif — https://$DOMAIN → 127.0.0.1:8090"
 
 # ── 6. Renouvellement SSL automatique ─────────────────────────────────────────
