@@ -1,14 +1,20 @@
 #!/bin/bash
 # ─────────────────────────────────────────────────────────────────────────────
 # init-server.sh — Initialisation du serveur VPS (Ubuntu 22.04)
-# À exécuter UNE SEULE FOIS sur le serveur cible
-# Usage : bash init-server.sh
+# À exécuter UNE SEULE FOIS sur le serveur cible, en root ou sudo
+# Usage : sudo bash init-server.sh
+#
+# Architecture SSL :
+#   nginx SYSTÈME (ports 80/443) → certbot SYSTÈME
+#   prod-frontend Docker exposé sur 127.0.0.1:8090 uniquement
+#   Pas de Docker nginx : le VPS peut être partagé avec d'autres applis
 # ─────────────────────────────────────────────────────────────────────────────
 set -e
 
 DOMAIN="vps.lhspla-ci.org"
 EMAIL="admin@lhspla.ci"
 APP_DIR="/home/markov/lhspla"
+ACME_ROOT="/var/www/certbot"
 
 echo "══════════════════════════════════════════════"
 echo "  LHSPLA — Initialisation serveur"
@@ -37,12 +43,20 @@ else
   echo "✅ Docker Compose installé : $(docker compose version)"
 fi
 
-# ── 3. Réseaux Docker ─────────────────────────────────────────────────────────
+# ── 3. Nginx système + Certbot ────────────────────────────────────────────────
+echo "▶ Installation nginx système + certbot..."
+apt-get update -qq
+apt-get install -y nginx certbot python3-certbot-nginx
+systemctl enable nginx
+systemctl start nginx
+echo "✅ Nginx : $(nginx -v 2>&1 | tr -d '\n')"
+
+# ── 4. Réseaux Docker ─────────────────────────────────────────────────────────
 echo "▶ Création des réseaux Docker..."
 docker network create lhspla-prod-net 2>/dev/null || echo "  lhspla-prod-net déjà présent"
 docker network create lhspla-stg-net  2>/dev/null || echo "  lhspla-stg-net déjà présent"
 
-# ── 4. Fichiers .env ──────────────────────────────────────────────────────────
+# ── 5. Fichiers .env ──────────────────────────────────────────────────────────
 cd "$APP_DIR"
 
 if [ ! -f .env.prod ]; then
@@ -55,38 +69,56 @@ if [ ! -f .env.prod ]; then
   read -p "Appuyez sur Entrée quand les fichiers .env sont prêts..."
 fi
 
-# ── 5. Démarrer nginx HTTP (pour ACME challenge Certbot) ─────────────────────
-echo "▶ Démarrage nginx en mode HTTP (pour obtenir le certificat SSL)..."
-# Désactiver temporairement prod.conf (qui requiert SSL)
-mv docker/nginx/conf.d/prod.conf docker/nginx/conf.d/prod.conf.disabled 2>/dev/null || true
-docker compose -f docker-compose.infra.yml up -d nginx
-sleep 3
+# ── 6. Config nginx HTTP (ACME challenge uniquement) ─────────────────────────
+echo "▶ Config nginx HTTP pour ACME challenge..."
+mkdir -p "$ACME_ROOT"
 
-# ── 6. Certificat Let's Encrypt — domaine principal uniquement ────────────────
+cat > /etc/nginx/sites-available/lhspla <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root $ACME_ROOT;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/lhspla /etc/nginx/sites-enabled/lhspla
+# Désactiver le vhost default si présent (évite conflit port 80)
+rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
+echo "✅ Nginx HTTP activé — ACME challenge prêt"
+
+# ── 7. Certificat Let's Encrypt ───────────────────────────────────────────────
 echo "▶ Obtention du certificat SSL pour $DOMAIN..."
-docker compose -f docker-compose.infra.yml run --rm certbot certonly \
-  --webroot -w /var/www/certbot \
+certbot certonly --webroot -w "$ACME_ROOT" \
   --email "$EMAIL" --agree-tos --no-eff-email \
   -d "$DOMAIN"
+echo "✅ Certificat obtenu"
 
-# Fichiers requis par nginx SSL
-if [ ! -f /etc/letsencrypt/options-ssl-nginx.conf ]; then
-  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
-    -o /etc/letsencrypt/options-ssl-nginx.conf
-fi
-if [ ! -f /etc/letsencrypt/ssl-dhparams.pem ]; then
-  curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem \
-    -o /etc/letsencrypt/ssl-dhparams.pem
-fi
+# ── 8. Config nginx HTTPS (proxy → prod-frontend:8090) ───────────────────────
+echo "▶ Activation config nginx HTTPS..."
+cp "$APP_DIR/docker/nginx-system/lhspla.conf" /etc/nginx/sites-available/lhspla
+nginx -t && systemctl reload nginx
+echo "✅ Nginx HTTPS actif — https://$DOMAIN"
 
-# Réactiver prod.conf SSL
-mv docker/nginx/conf.d/prod.conf.disabled docker/nginx/conf.d/prod.conf 2>/dev/null || true
+# ── 9. Renouvellement SSL automatique ─────────────────────────────────────────
+echo "▶ Cron renouvellement SSL..."
+echo "0 3 * * * root certbot renew --quiet --post-hook 'systemctl reload nginx'" \
+  > /etc/cron.d/certbot-lhspla
+echo "✅ Cron certbot configuré (3h00 quotidien)"
 
-# ── 7. Démarrer l'infrastructure complète ────────────────────────────────────
-echo "▶ Démarrage de l'infrastructure..."
+# ── 10. Infrastructure Docker (Portainer, pgAdmin, n8n) ──────────────────────
+echo "▶ Démarrage infrastructure Docker..."
 docker compose -f docker-compose.infra.yml --env-file .env.prod up -d
+echo "✅ Infrastructure démarrée"
 
-# ── 8. Premier déploiement staging ───────────────────────────────────────────
+# ── 11. Premier déploiement staging ──────────────────────────────────────────
 echo "▶ Premier déploiement staging..."
 bash scripts/deploy-staging.sh
 

@@ -53,6 +53,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY}/lhspla-frontend:prod
     container_name: prod-frontend
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:80"   # Accessible uniquement en local — nginx système proxie
     environment:
       API_HOST: prod-api
     depends_on:
