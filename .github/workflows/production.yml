@@ -110,24 +110,25 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cat > /home/markov/lhspla/.env.prod << 'EOF'
-            GITHUB_REPOSITORY=${{ github.repository }}
-            PROD_DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
-            PROD_JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
-            PROD_JWT_REFRESH_SECRET=${{ secrets.PROD_JWT_REFRESH_SECRET }}
-            MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}
-            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-            PGADMIN_EMAIL=admin@lhspla.ci
-            PGADMIN_PASSWORD=${{ secrets.PGADMIN_PASSWORD }}
-            N8N_USER=admin
-            N8N_PASSWORD=${{ secrets.N8N_PASSWORD }}
-            MAIL_HOST=smtp.gmail.com
-            MAIL_PORT=587
-            MAIL_USER=
-            MAIL_PASS=
-            MAIL_FROM=LHSPLA <noreply@lhspla.ci>
-            EOF
+            printf '%s\n' \
+              'GITHUB_REPOSITORY=${{ github.repository }}' \
+              'PROD_DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}' \
+              'PROD_JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}' \
+              'PROD_JWT_REFRESH_SECRET=${{ secrets.PROD_JWT_REFRESH_SECRET }}' \
+              'MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}' \
+              'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' \
+              'PGADMIN_EMAIL=admin@lhspla.ci' \
+              'PGADMIN_PASSWORD=${{ secrets.PGADMIN_PASSWORD }}' \
+              'N8N_USER=admin' \
+              'N8N_PASSWORD=${{ secrets.N8N_PASSWORD }}' \
+              'MAIL_HOST=smtp.gmail.com' \
+              'MAIL_PORT=587' \
+              'MAIL_USER=' \
+              'MAIL_PASS=' \
+              'MAIL_FROM=LHSPLA <noreply@lhspla.ci>' \
+              > /home/markov/lhspla/.env.prod
             chmod 600 /home/markov/lhspla/.env.prod
+            echo "✅ .env.prod écrit ($(wc -l < /home/markov/lhspla/.env.prod) lignes)"
 
       - name: Docker pull & up production
         uses: appleboy/ssh-action@v1.0.3

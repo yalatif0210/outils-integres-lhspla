@@ -97,20 +97,21 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cat > /home/markov/lhspla/.env.staging << 'EOF'
-            GITHUB_REPOSITORY=${{ github.repository }}
-            STG_DB_PASSWORD=${{ secrets.STG_DB_PASSWORD }}
-            STG_JWT_SECRET=${{ secrets.STG_JWT_SECRET }}
-            STG_JWT_REFRESH_SECRET=${{ secrets.STG_JWT_REFRESH_SECRET }}
-            MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}
-            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-            MAIL_HOST=smtp.gmail.com
-            MAIL_PORT=587
-            MAIL_USER=
-            MAIL_PASS=
-            MAIL_FROM=LHSPLA Staging <noreply@lhspla.ci>
-            EOF
+            printf '%s\n' \
+              'GITHUB_REPOSITORY=${{ github.repository }}' \
+              'STG_DB_PASSWORD=${{ secrets.STG_DB_PASSWORD }}' \
+              'STG_JWT_SECRET=${{ secrets.STG_JWT_SECRET }}' \
+              'STG_JWT_REFRESH_SECRET=${{ secrets.STG_JWT_REFRESH_SECRET }}' \
+              'MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}' \
+              'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' \
+              'MAIL_HOST=smtp.gmail.com' \
+              'MAIL_PORT=587' \
+              'MAIL_USER=' \
+              'MAIL_PASS=' \
+              'MAIL_FROM=LHSPLA Staging <noreply@lhspla.ci>' \
+              > /home/markov/lhspla/.env.staging
             chmod 600 /home/markov/lhspla/.env.staging
+            echo "✅ .env.staging écrit ($(wc -l < /home/markov/lhspla/.env.staging) lignes)"
 
       - name: Docker pull & up staging
         uses: appleboy/ssh-action@v1.0.3
