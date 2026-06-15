@@ -23,4 +23,5 @@ ENV API_HOST=api
 
 EXPOSE 80
 
-# nginx-entrypoint.sh built-in de l'image nginx:alpine traite automatiquement /etc/nginx/templates/
+# Substitue UNIQUEMENT ${API_HOST} — les variables nginx ($host, $remote_addr…) restent intactes
+CMD ["/bin/sh", "-c", "envsubst '${API_HOST}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
