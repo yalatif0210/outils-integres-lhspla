@@ -63,6 +63,7 @@ services:
 networks:
   lhspla-prod-net:
     name: lhspla-prod-net
+    external: true
 
 volumes:
   prod-db-data:

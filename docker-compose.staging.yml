@@ -65,6 +65,7 @@ services:
 networks:
   lhspla-stg-net:
     name: lhspla-stg-net
+    external: true
 
 volumes:
   stg-db-data:
