@@ -1,6 +1,6 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,7 +16,6 @@ import { ApiService } from '../../services/api.service';
 import { AppConfigService } from '../../services/app-config.service';
 import { ENTITIES, CriticalityLevel } from '../../models/bulletin.models';
 import { firstValueFrom, forkJoin } from 'rxjs';
-import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-compilation',
@@ -72,8 +71,8 @@ import * as XLSX from 'xlsx';
             <span class="badge critique" *ngIf="critiqueCount() > 0">{{critiqueCount()}} critiques</span>
           </div>
           <div class="export-row" *ngIf="!loading()">
-            <button class="btn-pdf" (click)="print()">
-              <mat-icon>print</mat-icon> PDF
+            <button class="btn-pdf" (click)="openBrief()" matTooltip="Générer le Weekly Operations Brief (remplace la compilation PDF)">
+              <mat-icon>newspaper</mat-icon> Weekly Brief
             </button>
             <button class="btn-excel" (click)="exportExcel()">
               <mat-icon>table_view</mat-icon> Excel
@@ -491,6 +490,7 @@ export class CompilationComponent implements OnInit {
   readonly cfg = inject(AppConfigService);
   private snackBar = inject(MatSnackBar);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
 
   readonly entities = ENTITIES;
 
@@ -664,73 +664,34 @@ export class CompilationComponent implements OnInit {
     }
   }
 
-  exportExcel() {
+  async exportExcel() {
     const week = this.selectedWeek();
-    const wb = XLSX.utils.book_new();
-
-    // ── Section B — Activités réalisées ──────────────────────────────────────
-    const rowsB: any[] = [];
-    for (const entity of this.entities) {
-      const acts = this.getFilledActivities(entity.code);
-      if (!acts.length) continue;
-      rowsB.push(['', '', '', '', '', '']); // blank separator
-      rowsB.push([entity.code + ' — ' + entity.fullName, '', '', '', '', '']);
-      rowsB.push(['N°', "Titre de l'activité", 'Objectifs', 'Lieu', 'Date(s)', 'Recommandations / Résultats clés']);
-      acts.forEach((a, i) => rowsB.push([i + 1, a.title, a.objectives, a.location, a.dates, a.recommendations]));
+    if (!week?.weekStart) {
+      this.snackBar.open('Aucune semaine sélectionnée', 'Fermer', { duration: 3000 });
+      return;
     }
-    const wsB = XLSX.utils.aoa_to_sheet(rowsB.length ? rowsB : [['Aucune donnée']]);
-    wsB['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 35 }, { wch: 15 }, { wch: 12 }, { wch: 40 }];
-    XLSX.utils.book_append_sheet(wb, wsB, 'B - Activités réalisées');
-
-    // ── Section C — Activités planifiées ─────────────────────────────────────
-    const rowsC: any[] = [];
-    for (const entity of this.entities) {
-      const acts = this.getFilledPlanned(entity.code);
-      if (!acts.length) continue;
-      rowsC.push(['', '', '', '', '', '', '']);
-      rowsC.push([entity.code + ' — ' + entity.fullName, '', '', '', '', '', '']);
-      rowsC.push(['N°', "Titre de l'activité", 'Objectifs', 'Lieu', 'Dates prévues', 'DoS ?', 'Observations']);
-      acts.forEach((a, i) => rowsC.push([i + 1, a.title, a.objectives, a.location, a.plannedDates, a.dosParticipation ?? '—', a.observations]));
+    const semaine = new Date(week.weekStart).toISOString().slice(0, 10);
+    this.snackBar.open('Génération du bulletin Excel en cours…', '', { duration: 0 });
+    try {
+      const blob = await firstValueFrom(this.api.exportBulletinExcel(semaine));
+      const url = URL.createObjectURL(blob as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Bulletin_Hebdo_LHSPLA_${semaine}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      this.snackBar.dismiss();
+    } catch {
+      this.snackBar.open('Erreur lors de la génération du bulletin', 'Fermer', { duration: 5000 });
     }
-    const wsC = XLSX.utils.aoa_to_sheet(rowsC.length ? rowsC : [['Aucune donnée']]);
-    wsC['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 35 }, { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 35 }];
-    XLSX.utils.book_append_sheet(wb, wsC, 'C - Activités planifiées');
+  }
 
-    // ── Section D — Points de vigilance ──────────────────────────────────────
-    const rowsD: any[] = [];
-    for (const entity of this.entities) {
-      const risks = this.getFilledRisks(entity.code);
-      if (!risks.length) continue;
-      rowsD.push(['', '', '', '', '']);
-      rowsD.push([entity.code + ' — ' + entity.fullName, '', '', '', '']);
-      rowsD.push(['N°', 'Catégorie', 'Description', 'Criticité', 'Action attendue']);
-      risks.forEach((r, i) => rowsD.push([i + 1, r.category, r.description, r.criticality ?? '—', r.expectedAction]));
-    }
-    const wsD = XLSX.utils.aoa_to_sheet(rowsD.length ? rowsD : [['Aucune donnée']]);
-    wsD['!cols'] = [{ wch: 8 }, { wch: 20 }, { wch: 45 }, { wch: 15 }, { wch: 40 }];
-    XLSX.utils.book_append_sheet(wb, wsD, 'D - Points de vigilance');
-
-    // ── Synthèse ─────────────────────────────────────────────────────────────
-    const rowsS: any[] = [
-      ['COMPILATION HEBDOMADAIRE — ' + (week?.weekReference ?? ''), '', '', '', ''],
-      ['', '', '', '', ''],
-      ['Entité', 'Statut', 'Activités réalisées', 'Activités planifiées', 'Points de vigilance'],
-      ...this.entities.map(e => [
-        e.code,
-        this.getSubmission(e.code)?.status === 'submitted' ? 'Soumis' : 'En attente / Brouillon',
-        this.getFilledActivities(e.code).length,
-        this.getFilledPlanned(e.code).length,
-        this.getFilledRisks(e.code).length,
-      ]),
-      ['', '', '', '', ''],
-      ['TOTAL', '', this.totalActivities(), this.totalPlanned(), this.totalRisks()],
-    ];
-    const wsS = XLSX.utils.aoa_to_sheet(rowsS);
-    wsS['!cols'] = [{ wch: 12 }, { wch: 28 }, { wch: 22 }, { wch: 22 }, { wch: 22 }];
-    XLSX.utils.book_append_sheet(wb, wsS, 'Synthèse');
-
-    const filename = `Compilation_${week?.weekReference?.replace(/\//g, '-') ?? 'LHSPLA'}.xlsx`;
-    XLSX.writeFile(wb, filename);
+  openBrief() {
+    const week = this.selectedWeek();
+    const semaine = week?.weekStart
+      ? new Date(week.weekStart).toISOString().slice(0, 10)
+      : undefined;
+    this.router.navigate(['/brief'], semaine ? { queryParams: { semaine } } : {});
   }
 
   print() {

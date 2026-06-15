@@ -890,7 +890,18 @@ export class EntityFormComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.routeSub = this.route.params.subscribe(params => {
-      this.entityCode = params['code'];
+      const newCode = params['code'];
+      if (newCode !== this.entityCode) {
+        this.entityCode = newCode;
+        if (this.weekId) {
+          // Entity changed while weekId is already known — reload without waiting for queryParams
+          Object.values(this.saveTimers).forEach(t => clearTimeout(t));
+          this.saveTimers = {};
+          this.pendingSectionSet.set(new Set());
+          clearInterval(this.presencePollInterval);
+          this.loadData();
+        }
+      }
     });
     this.route.queryParams.subscribe(async qp => {
       const paramWeekId = qp['week'] ?? '';

@@ -135,7 +135,7 @@ export class NotificationsService {
     );
   }
 
-  async notifyBudgetReturnedToDraft(entityCode: string, budgetType: string, title: string, budgetId: string, reason: string, stage: 'Finance' | 'TPM') {
+  async notifyBudgetReturnedToDraft(entityCode: string, budgetType: string, title: string, budgetId: string, reason: string, stage: 'Finance' | 'TPM' | 'COP') {
     await this.createForEntity(
       entityCode,
       'BUDGET_RETURNED',

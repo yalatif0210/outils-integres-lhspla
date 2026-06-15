@@ -70,11 +70,17 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kB",
-                  "maximumError": "8kB"
+                  "maximumWarning": "16kB",
+                  "maximumError": "32kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "allowedCommonJsDependencies": [
+                "html2canvas",
+                "jspdf",
+                "xlsx",
+                "pdfmake"
+              ]
             },
             "development": {
               "optimization": false,

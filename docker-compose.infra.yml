@@ -1,0 +1,88 @@
+services:
+
+  # ── Reverse proxy SSL prod ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: lhspla-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-certs:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+    networks:
+      - lhspla-prod-net
+
+  # ── Certbot renouvellement automatique ───────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: lhspla-certbot
+    volumes:
+      - certbot-certs:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+
+  # ── Portainer — port 9000 ─────────────────────────────────────────────────────
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: lhspla-portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+
+  # ── pgAdmin — port 5050 ───────────────────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lhspla-pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:5050"
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    ${PGADMIN_EMAIL:-admin@lhspla.ci}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_LISTEN_PORT:      5050
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+  # ── n8n (SMS notifications) — port 5678 ──────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: lhspla-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_HOST:                n8n
+      N8N_PORT:                5678
+      N8N_PROTOCOL:            http
+      WEBHOOK_URL:             http://vps.lhspla-ci.org:5678/
+      N8N_BASIC_AUTH_ACTIVE:   true
+      N8N_BASIC_AUTH_USER:     ${N8N_USER:-admin}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD}
+      GENERIC_TIMEZONE:        Africa/Abidjan
+      TZ:                      Africa/Abidjan
+    volumes:
+      - n8n-data:/home/node/.n8n
+    networks:
+      - lhspla-prod-net
+      - lhspla-stg-net
+
+networks:
+  lhspla-prod-net:
+    name: lhspla-prod-net
+    external: true
+  lhspla-stg-net:
+    name: lhspla-stg-net
+    external: true
+
+volumes:
+  certbot-certs:
+  certbot-www:
+  portainer-data:
+  pgadmin-data:
+  n8n-data:

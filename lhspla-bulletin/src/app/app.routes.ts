@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, adminGuard, adminOrCOPGuard, budgetReviewGuard, tpmReviewGuard, copReviewGuard, personnelAdminGuard, missionDashboardGuard, settingsGuard } from './guards/auth.guard';
+import { authGuard, adminGuard, adminOrCOPGuard, budgetReviewGuard, tpmReviewGuard, copReviewGuard, personnelAdminGuard, missionDashboardGuard, settingsGuard, stockImportGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'home', pathMatch: 'full' },
@@ -46,6 +46,11 @@ export const routes: Routes = [
     path: 'admin/settings',
     canActivate: [authGuard, settingsGuard],
     loadComponent: () => import('./components/admin-settings/admin-settings.component').then(m => m.AdminSettingsComponent)
+  },
+  {
+    path: 'admin/config-lists',
+    canActivate: [authGuard, settingsGuard],
+    loadComponent: () => import('./components/admin-config-lists/admin-config-lists.component').then(m => m.AdminConfigListsComponent)
   },
   {
     path: 'profile',
@@ -116,6 +121,22 @@ export const routes: Routes = [
     path: 'dashboard/financial',
     canActivate: [authGuard, adminOrCOPGuard],
     loadComponent: () => import('./components/financial-dashboard/financial-dashboard.component').then(m => m.FinancialDashboardComponent)
+  },
+  { path: 'stock', redirectTo: 'stock/consult', pathMatch: 'full' },
+  {
+    path: 'stock/import',
+    canActivate: [authGuard, stockImportGuard],
+    loadComponent: () => import('./components/stock-import/stock-import.component').then(m => m.StockImportComponent)
+  },
+  {
+    path: 'stock/consult',
+    canActivate: [authGuard],
+    loadComponent: () => import('./components/stock-consult/stock-consult.component').then(m => m.StockConsultComponent)
+  },
+  {
+    path: 'brief',
+    canActivate: [authGuard],
+    loadComponent: () => import('./components/brief-generator/brief-generator.component').then(m => m.BriefGeneratorComponent)
   },
   { path: '**', redirectTo: 'home' }
 ];

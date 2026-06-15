@@ -62,10 +62,27 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
               <span class="status-badge" [style.background]="statusColor(budget()?.status)">{{statusLabel(budget()?.status)}}</span>
             </p>
           </div>
-          <div class="header-actions" *ngIf="!isNew() && budget()?.status === 'approved'">
-            <button mat-raised-button class="btn-pdf" (click)="exportPDF()">
-              <mat-icon>picture_as_pdf</mat-icon> Exporter PDF
-            </button>
+          <div class="header-actions" *ngIf="!isNew()">
+            <!-- Actions budget approuvé -->
+            <ng-container *ngIf="budget()?.status === 'approved'">
+              <button mat-raised-button class="btn-pdf" (click)="exportPDF()">
+                <mat-icon>picture_as_pdf</mat-icon> Exporter PDF
+              </button>
+              <button mat-raised-button class="btn-cloture" (click)="cloturerBudget()"
+                      *ngIf="canCloturer()" [disabled]="saving()">
+                <mat-icon>lock</mat-icon> Clôturer
+              </button>
+            </ng-container>
+            <!-- Actions budget clôturé -->
+            <ng-container *ngIf="budget()?.status === 'cloture'">
+              <button mat-raised-button class="btn-archive-zip" (click)="downloadArchiveZip()" [disabled]="saving()">
+                <mat-icon>folder_zip</mat-icon> Télécharger archive ZIP
+              </button>
+              <button mat-raised-button class="btn-declassifier" (click)="declassifierBudget()"
+                      *ngIf="canDeclassifier()" [disabled]="saving()">
+                <mat-icon>lock_open</mat-icon> Déclassifier
+              </button>
+            </ng-container>
           </div>
         </div>
       </div>
@@ -102,6 +119,11 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
                 <mat-select [(ngModel)]="editFundId">
                   <mat-option *ngFor="let f of funds()" [value]="f.id">{{f.name}} ({{f.code}})</mat-option>
                 </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Date probable d'exécution</mat-label>
+                <input matInput type="date" [(ngModel)]="editProbableExecutionDate">
               </mat-form-field>
 
               <!-- Taux de change : éditable uniquement par admin_finance/super_admin -->
@@ -144,6 +166,9 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
               <div class="meta-item"><mat-icon>currency_exchange</mat-icon><span>1 USD = {{editExchangeRate}} FCFA</span></div>
               <div class="meta-item" *ngIf="isContractualisation()">
                 <mat-icon>percent</mat-icon><span>Frais transfert : {{editTransferFeeRate}}%</span>
+              </div>
+              <div class="meta-item" *ngIf="budget()?.probableExecutionDate">
+                <mat-icon>event</mat-icon><span>Exécution prévue : {{budget()?.probableExecutionDate | date:'dd/MM/yyyy'}}</span>
               </div>
             </div>
           </mat-card-content>
@@ -216,6 +241,9 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
                   </td>
                   <td class="num-cell">
                     <input *ngIf="canEdit()" type="number" class="cell-input num-input"
+                           [class.locked-cost]="!!lineMap()[row.rowKey]?.costItemId"
+                           [readonly]="!!lineMap()[row.rowKey]?.costItemId"
+                           [title]="lineMap()[row.rowKey]?.costItemId ? 'Coût verrouillé (issu de la grille)' : ''"
                            [ngModel]="lineMap()[row.rowKey]?.unitCost"
                            (ngModelChange)="updateLine(row.rowKey, 'unitCost', +$event || null)"
                            min="0" placeholder="0">
@@ -400,7 +428,10 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
     .page-header-inner h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
     .page-header-inner p { margin: 0; opacity: .85; font-size: .82rem; }
     .header-actions { margin-left: auto; display: flex; gap: 8px; }
-    .btn-pdf { background: #C00000 !important; color: #fff !important; }
+    .btn-pdf          { background: #C00000 !important; color: #fff !important; }
+    .btn-cloture      { background: #4A1942 !important; color: #fff !important; }
+    .btn-archive-zip  { background: #1B5E20 !important; color: #fff !important; }
+    .btn-declassifier { background: #E65100 !important; color: #fff !important; }
     .status-badge { padding: 1px 8px; border-radius: 10px; font-size: .75rem; font-weight: 600; color: #fff; }
 
     .loading-state { text-align: center; padding: 60px; color: #888; }
@@ -459,6 +490,7 @@ type DisplayRow = BudgetRow | { rowKey: string; type: 'hidden_placeholder'; labe
     .desig-input { width: 100%; }
     .num-input { text-align: right; width: 100%; }
     .num-input[readonly] { color: #666; cursor: default; }
+    .num-input.locked-cost { background:#eef4fb; color:#1F4E79; font-weight:600; cursor:not-allowed; border-bottom:1px solid #aab8c9 !important; }
     .del-btn {
       border: none; background: none; color: #C00000; font-size: 16px; font-weight: 700;
       cursor: pointer; padding: 0 3px; line-height: 1; border-radius: 3px;
@@ -573,6 +605,7 @@ export class BudgetFormComponent implements OnInit {
   editActivityRefId = '';
   editExchangeRate = 655;
   editTransferFeeRate = 5;
+  editProbableExecutionDate = '';
   tvaRate = 0.18;
   tdtRate = 0.025;
 
@@ -842,10 +875,15 @@ export class BudgetFormComponent implements OnInit {
         },
       }));
     } else {
-      // Valeur libre non reconnue — on remet le texte courant dans le DOM
-      const current = this.lineMap()[rowKey];
-      const templateRow = this.rows().find(r => r.rowKey === rowKey);
-      inputEl.value = current?.designation ?? templateRow?.label ?? '';
+      // Saisie libre non reconnue — accepter le texte et effacer costItemId pour débloquer le coût unitaire
+      this.lineMap.update(m => ({
+        ...m,
+        [rowKey]: {
+          ...(m[rowKey] ?? { designation: '', unitCost: null, quantity: null, frequency: null, costItemId: null }),
+          designation: value,
+          costItemId: null,
+        },
+      }));
     }
   }
 
@@ -957,6 +995,7 @@ export class BudgetFormComponent implements OnInit {
         this.editActivityRefId = b.activityReferenceId ?? '';
         this.editExchangeRate = b.exchangeRate ?? this.editExchangeRate;
         this.editTransferFeeRate = Math.round((b.transferFeeRate ?? 0.05) * 1000) / 10;
+        this.editProbableExecutionDate = b.probableExecutionDate ? b.probableExecutionDate.substring(0, 10) : '';
         this.newType = b.budgetType;
         this.initLineMap(BUDGET_TEMPLATES[b.budgetType] ?? [], b.lines ?? []);
       } else {
@@ -997,6 +1036,7 @@ export class BudgetFormComponent implements OnInit {
         transferFeeRate: this.editTransferFeeRate / 100,
         totalAmount: this.amounts()['grand_total'] ?? 0,
         lines: this.buildLines(),
+        probableExecutionDate: this.editProbableExecutionDate || undefined,
       };
       if (this.editActivityRefId) payload.activityReferenceId = this.editActivityRefId;
 
@@ -1076,9 +1116,9 @@ export class BudgetFormComponent implements OnInit {
     }
   }
 
-  async exportPDF() {
+  private async buildPdfDoc(): Promise<import('jspdf').jsPDF | null> {
     const b = this.budget();
-    if (!b) return;
+    if (!b) return null;
 
     // A4 paysage — 297 × 210 mm, marges 10 mm → largeur utile 277 mm
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -1134,11 +1174,12 @@ export class BudgetFormComponent implements OnInit {
 
     // ── En-tête (L1 centré, L2 logos+BUDGET, L3 taux) ─────────────────
 
-    // L1 : TITRE :  [titre activité] — centré
+    // L1 : budgetNumber : titre (ou TITRE : titre si pas de numéro)
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal', 'bold');
     doc.setTextColor(...black);
-    doc.text(`TITRE :  ${b.title || ''}`, pageW / 2, 7, { align: 'center', maxWidth: pageW - 2 * mL });
+    const titreLabel = b.budgetNumber ? `${b.budgetNumber} : ${b.title || ''}` : `TITRE :  ${b.title || ''}`;
+    doc.text(titreLabel, pageW / 2, 7, { align: 'center', maxWidth: pageW - 2 * mL });
 
     // L2 : logo gauche | BUDGET [fonds] | logo droite
     // Dimensions depuis les EMU Excel (1 EMU = 1/914400 pouce = 0,0254/914400 m)
@@ -1154,7 +1195,11 @@ export class BudgetFormComponent implements OnInit {
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...black);
-    doc.text(`BUDGET  ${b.fund?.name ?? ''}`, pageW / 2, 18, { align: 'center' });
+    const actCode = b.activityReference?.activityCode;
+    const budgetHeadLabel = actCode
+      ? `BUDGET  ${b.fund?.name ?? ''}   |   Activité : ${actCode}`
+      : `BUDGET  ${b.fund?.name ?? ''}`;
+    doc.text(budgetHeadLabel, pageW / 2, 18, { align: 'center' });
 
     // L3 : 1 dollar = X FCFA — aligné droite (comme cols E-G du modèle)
     doc.setFontSize(9);
@@ -1259,10 +1304,95 @@ export class BudgetFormComponent implements OnInit {
         doc.setFontSize(6.5);
         doc.setTextColor(150, 150, 150);
         doc.text(`Page ${current}/${pageCount}`, pageW / 2, 206, { align: 'center' });
+        // Signature système discrète
+        const sigDate = new Date().toISOString().slice(0, 10);
+        const rawSig = btoa((b.id + (b.budgetNumber ?? '')).slice(0, 36)).replace(/[^A-Z0-9]/gi, '').slice(0, 12).toUpperCase();
+        doc.setFontSize(5.5);
+        doc.setTextColor(190, 190, 190);
+        doc.text(`${sigDate} | ${rawSig}`, pageW - mR, 206, { align: 'right' });
       },
     });
 
+    return doc;
+  }
+
+  async exportPDF() {
+    const b = this.budget();
+    if (!b) return;
+    const doc = await this.buildPdfDoc();
+    if (!doc) return;
     const fundCode = b.fund?.code ?? b.id.slice(0, 8);
     doc.save(`Budget_${b.entityCode}_${b.budgetType}_${fundCode}_${b.id.slice(0, 8)}.pdf`);
+  }
+
+  // ── Clôture ────────────────────────────────────────────────────────────────
+
+  canCloturer() {
+    const roles: string[] = this.auth.currentUser()?.roles ?? [];
+    return roles.some(r => ['admin_finance', 'super_admin'].includes(r));
+  }
+
+  canDeclassifier() {
+    const roles: string[] = this.auth.currentUser()?.roles ?? [];
+    return roles.includes('super_admin');
+  }
+
+  async cloturerBudget() {
+    const b = this.budget();
+    if (!b) return;
+    this.saving.set(true);
+    try {
+      const updated = await firstValueFrom(this.api.cloturerBudget(b.id));
+      this.budget.set(updated);
+      this.snack.open('Budget clôturé avec succès', 'OK', { duration: 3000 });
+    } catch (err: any) {
+      this.snack.open(err?.error?.message ?? 'Erreur lors de la clôture', 'OK', { duration: 4000 });
+    } finally { this.saving.set(false); }
+  }
+
+  async declassifierBudget() {
+    const b = this.budget();
+    if (!b) return;
+    this.saving.set(true);
+    try {
+      const updated = await firstValueFrom(this.api.declassifierBudget(b.id));
+      this.budget.set(updated);
+      this.snack.open('Budget déclassifié — statut restauré', 'OK', { duration: 3000 });
+    } catch (err: any) {
+      this.snack.open(err?.error?.message ?? 'Erreur lors de la déclassification', 'OK', { duration: 4000 });
+    } finally { this.saving.set(false); }
+  }
+
+  async downloadArchiveZip() {
+    const b = this.budget();
+    if (!b) return;
+    this.saving.set(true);
+    try {
+      // Générer le PDF budget côté client puis l'envoyer en base64 au backend
+      const doc = await this.buildPdfDoc();
+      const pdfBase64 = doc ? doc.output('datauristring').split(',')[1] : undefined;
+
+      const blob = await firstValueFrom(this.api.downloadBudgetArchiveZip(b.id, pdfBase64));
+      const ref = b.budgetNumber ?? b.id.slice(0, 8);
+      const date = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Budget_${ref}_archive_${date}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      let message = 'Erreur téléchargement archive';
+      try {
+        if (err?.error instanceof Blob) {
+          const text = await (err.error as Blob).text();
+          const parsed = JSON.parse(text);
+          message = parsed?.message ?? message;
+        } else {
+          message = err?.error?.message ?? err?.message ?? message;
+        }
+      } catch {}
+      this.snack.open(message, 'OK', { duration: 5000 });
+    } finally { this.saving.set(false); }
   }
 }

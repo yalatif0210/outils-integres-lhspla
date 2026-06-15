@@ -9,6 +9,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -48,7 +49,7 @@ const STATUS_COLORS: Record<string, string> = {
     CommonModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatSelectModule, MatAutocompleteModule,
-    MatCheckboxModule, MatSnackBarModule, MatTooltipModule,
+    MatChipsModule, MatCheckboxModule, MatSnackBarModule, MatTooltipModule,
     MatDividerModule, MatDatepickerModule, MatNativeDateModule,
   ],
   providers: [
@@ -124,10 +125,38 @@ const STATUS_COLORS: Record<string, string> = {
                   </mat-option>
                 </mat-autocomplete>
               </mat-form-field>
-              <mat-form-field appearance="outline" class="full-width">
+              <!-- City chips + autocomplete (when list loaded, editable) -->
+              <mat-form-field appearance="outline" class="full-width" *ngIf="cities().length > 0 && canEdit()">
                 <mat-label>Lieu(x) de mission *</mat-label>
-                <input matInput [(ngModel)]="form.location" placeholder="Ville(s), région(s)..."
-                       [readonly]="!canEdit()">
+                <mat-chip-grid #chipGrid>
+                  <mat-chip-row *ngFor="let city of selectedCities()" (removed)="removeCity(city)">
+                    {{city}}
+                    <button matChipRemove><mat-icon>cancel</mat-icon></button>
+                  </mat-chip-row>
+                </mat-chip-grid>
+                <input placeholder="Rechercher une ville..."
+                       [(ngModel)]="citySearch"
+                       [matChipInputFor]="chipGrid"
+                       [matChipInputAddOnBlur]="false"
+                       [matAutocomplete]="cityAuto">
+                <mat-autocomplete #cityAuto (optionSelected)="selectCity($event.option.value)">
+                  <mat-option *ngFor="let c of filteredCityList()" [value]="c">{{c}}</mat-option>
+                </mat-autocomplete>
+              </mat-form-field>
+              <!-- City read-only display (when list loaded, not editable) -->
+              <mat-form-field appearance="outline" class="full-width" *ngIf="cities().length > 0 && !canEdit()">
+                <mat-label>Lieu(x) de mission</mat-label>
+                <input matInput [value]="selectedCitiesText()" readonly>
+              </mat-form-field>
+              <!-- "Autre" free text (when Autre is selected) -->
+              <mat-form-field appearance="outline" class="full-width" *ngIf="cities().length > 0 && selectedCities().includes('Autre')">
+                <mat-label>Autre lieu (préciser)</mat-label>
+                <input matInput [(ngModel)]="otherLocation" [readonly]="!canEdit()" placeholder="Saisir les lieux supplémentaires...">
+              </mat-form-field>
+              <!-- Fallback text input (no cities configured) -->
+              <mat-form-field appearance="outline" class="full-width" *ngIf="cities().length === 0">
+                <mat-label>Lieu(x) de mission *</mat-label>
+                <input matInput [(ngModel)]="form.location" placeholder="Ville(s), région(s)..." [readonly]="!canEdit()">
               </mat-form-field>
             </div>
           </mat-card-content>
@@ -151,19 +180,32 @@ const STATUS_COLORS: Record<string, string> = {
                 <mat-label>Date de retour *</mat-label>
                 <input matInput [matDatepicker]="pickerRet"
                        [ngModel]="returnDateObj"
-                       (dateChange)="form.returnDate = dateToStr($event.value); returnDateObj = $event.value"
+                       (dateChange)="onReturnDateChange($event.value)"
                        [disabled]="!canEdit()">
                 <mat-datepicker-toggle matIconSuffix [for]="pickerRet" [disabled]="!canEdit()"></mat-datepicker-toggle>
                 <mat-datepicker #pickerRet></mat-datepicker>
               </mat-form-field>
               <mat-form-field appearance="outline">
-                <mat-label>Date de reprise *</mat-label>
+                <mat-label>Date de reprise (auto)</mat-label>
                 <input matInput [matDatepicker]="pickerRes"
                        [ngModel]="resumeDateObj"
-                       (dateChange)="form.resumeDate = dateToStr($event.value); resumeDateObj = $event.value"
-                       [disabled]="!canEdit()">
-                <mat-datepicker-toggle matIconSuffix [for]="pickerRes" [disabled]="!canEdit()"></mat-datepicker-toggle>
+                       disabled>
+                <mat-datepicker-toggle matIconSuffix [for]="pickerRes" disabled></mat-datepicker-toggle>
                 <mat-datepicker #pickerRes></mat-datepicker>
+                <mat-hint>1er jour ouvrable après le retour</mat-hint>
+              </mat-form-field>
+              <!-- Moyen de transport : select si liste configurée, sinon input libre -->
+              <mat-form-field appearance="outline" *ngIf="transportModes().length > 0">
+                <mat-label>Moyen de transport</mat-label>
+                <mat-select [(ngModel)]="form.transportMode" [disabled]="!canEdit()">
+                  <mat-option value="">— Sélectionner —</mat-option>
+                  <mat-option *ngFor="let t of transportModes()" [value]="t">{{t}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" *ngIf="transportModes().length === 0">
+                <mat-label>Moyen de transport</mat-label>
+                <input matInput [(ngModel)]="form.transportMode" [readonly]="!canEdit()" placeholder="Ex: Véhicule NPSP, Avion...">
+                <mat-hint>Configurer la liste dans Admin → Listes configurables</mat-hint>
               </mat-form-field>
             </div>
           </mat-card-content>
@@ -203,8 +245,20 @@ const STATUS_COLORS: Record<string, string> = {
                   <mat-option *ngFor="let b of budgets()" [value]="b.id">
                     {{b.title}} — {{b.createdAt | date:'dd/MM/yyyy'}}
                   </mat-option>
+                  <mat-option value="__MANUAL__">
+                    <mat-icon style="font-size:16px;vertical-align:middle;margin-right:4px">edit_note</mat-icon>
+                    Référence manuelle (budget non listé)
+                  </mat-option>
                 </mat-select>
               </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="form.budgetId === '__MANUAL__' && canEdit()">
+                <mat-label>Référence budgétaire *</mat-label>
+                <input matInput [(ngModel)]="form.manualBudgetRef" placeholder="Ex: PEPFAR-2026-Q3, A005-FY26...">
+              </mat-form-field>
+              <div class="manual-budget-display" *ngIf="form.budgetId === '__MANUAL__' && !canEdit() && form.manualBudgetRef">
+                <mat-icon>edit_note</mat-icon>
+                <span>Réf. manuelle : <strong>{{form.manualBudgetRef}}</strong></span>
+              </div>
             </div>
           </mat-card-content>
         </mat-card>
@@ -278,31 +332,7 @@ const STATUS_COLORS: Record<string, string> = {
           </mat-card-content>
         </mat-card>
 
-        <!-- Section TPM Review (admin_tpm / super_admin only, status = pending_tpm) -->
-        <mat-card class="form-section review-section tpm-review-section" *ngIf="showTpmReview()">
-          <mat-card-content>
-            <h3 class="section-title"><mat-icon>verified_user</mat-icon> Avis TPM</h3>
-            <div class="review-actions">
-              <mat-form-field appearance="outline" class="full-width" *ngIf="tpmDecision === 'rejected'">
-                <mat-label>Motif du rejet</mat-label>
-                <textarea matInput [(ngModel)]="tpmRejectionReason" rows="2" placeholder="Expliquer pourquoi..."></textarea>
-              </mat-form-field>
-              <div class="review-btns">
-                <button mat-raised-button class="btn-approve"
-                        (click)="tpmDecision='approved'; tpmReview()" [disabled]="saving()">
-                  <mat-icon>check_circle</mat-icon> Approuver (→ COP)
-                </button>
-                <button mat-raised-button color="warn"
-                        (click)="onTpmRejectClick()" [disabled]="saving()">
-                  <mat-icon>{{tpmDecision === 'rejected' ? 'send' : 'cancel'}}</mat-icon>
-                  {{tpmDecision === 'rejected' ? 'Confirmer le rejet' : 'Rejeter'}}
-                </button>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-
-        <!-- Section COP Review (COP / super_admin only, status = cop_approved) -->
+        <!-- Section COP Review (COP / super_admin only, status = pending_cop) -->
         <mat-card class="form-section review-section" *ngIf="showCopReview()">
           <mat-card-content>
             <h3 class="section-title"><mat-icon>how_to_reg</mat-icon> Avis du Chef de Parti</h3>
@@ -476,6 +506,8 @@ const STATUS_COLORS: Record<string, string> = {
     .btn-upload-signed { background:#7b1fa2 !important; color:#fff !important; }
     .btn-dl-signed { border-color:#7b1fa2 !important; color:#7b1fa2 !important; margin-left:auto; }
     .upload-hint { font-size:.78rem; color:#888; }
+    .manual-budget-display { display:flex; align-items:center; gap:8px; font-size:.85rem; color:#555; grid-column:1/-1; padding:4px 0; }
+    .manual-budget-display mat-icon { font-size:18px; width:18px; height:18px; color:#1F4E79; }
 
     @media (max-width:640px) {
       .form-grid { grid-template-columns:1fr; }
@@ -498,6 +530,11 @@ export class MissionFormComponent implements OnInit {
   funds = signal<any[]>([]);
   budgets = signal<any[]>([]);
   activityRefs = signal<any[]>([]);
+  cities = signal<string[]>([]);
+  transportModes = signal<string[]>([]);
+  selectedCities = signal<string[]>([]);
+  otherLocation = '';
+  citySearch = '';
 
   STATUS_TEXT_COLOR = 'white';
 
@@ -543,14 +580,28 @@ export class MissionFormComponent implements OnInit {
     object: string; location: string;
     departureDate: string; returnDate: string; resumeDate: string;
     fundId: string; budgetId: string; activityRefId: string;
-  } = { object: '', location: '', departureDate: '', returnDate: '', resumeDate: '', fundId: '', budgetId: '', activityRefId: '' };
+    transportMode: string; manualBudgetRef: string;
+  } = { object: '', location: '', departureDate: '', returnDate: '', resumeDate: '', fundId: '', budgetId: '', activityRefId: '', transportMode: '', manualBudgetRef: '' };
+
+  selectedCitiesText = computed(() => {
+    const selected = this.selectedCities().filter(c => c !== 'Autre');
+    const parts = [...selected];
+    if (this.selectedCities().includes('Autre') && this.otherLocation) parts.push(this.otherLocation);
+    return parts.join(', ');
+  });
+
+  filteredCityList = computed(() => {
+    const q = this.citySearch.toLowerCase().trim();
+    const selected = this.selectedCities();
+    return this.cities()
+      .filter(c => !selected.includes(c))
+      .filter(c => !q || c.toLowerCase().includes(q));
+  });
 
   participantIds = signal<string[]>([]);
 
   copDecision: '' | 'cop_approved' | 'cancelled' = '';
   copRejectionReason = '';
-  tpmDecision: '' | 'approved' | 'rejected' = '';
-  tpmRejectionReason = '';
   signedDocUploading = signal(false);
 
   departureDateObj: Date | null = null;
@@ -568,6 +619,23 @@ export class MissionFormComponent implements OnInit {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  private nextWorkingDay(date: Date): Date {
+    const d = new Date(date);
+    d.setDate(d.getDate() + 1);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  onReturnDateChange(value: Date | null) {
+    this.returnDateObj = value;
+    this.form.returnDate = this.dateToStr(value);
+    if (value) {
+      const resume = this.nextWorkingDay(value);
+      this.resumeDateObj = resume;
+      this.form.resumeDate = this.dateToStr(resume);
+    }
+  }
+
   isNew = computed(() => !this.route.snapshot.params['id']);
 
   selectedParticipants = computed(() =>
@@ -582,12 +650,6 @@ export class MissionFormComponent implements OnInit {
   });
 
   canSubmit = computed(() => this.canEdit() && !!this.mission());
-
-  showTpmReview = computed(() => {
-    const m = this.mission();
-    if (!m) return false;
-    return m.status === 'pending_tpm' && this.auth.hasAnyRole('admin_tpm', 'super_admin');
-  });
 
   showCopReview = computed(() => {
     const m = this.mission();
@@ -628,10 +690,27 @@ export class MissionFormComponent implements OnInit {
     return this.auth.hasAnyRole('super_admin', 'admin_system', 'assistant_direction', 'chief_of_party');
   });
 
+  selectCity(city: string) {
+    if (!this.selectedCities().includes(city)) {
+      this.selectedCities.update(l => [...l, city]);
+    }
+    this.citySearch = '';
+  }
+
+  removeCity(city: string) {
+    this.selectedCities.update(l => l.filter(c => c !== city));
+    if (city === 'Autre') this.otherLocation = '';
+  }
+
   formValid() {
-    const hasBudget = !!this.form.budgetId; // accepte '__INVITATION__' et un vrai UUID
-    return this.form.object.trim() && this.form.location.trim()
-      && this.form.departureDate && this.form.returnDate && this.form.resumeDate
+    const hasBudget = this.form.budgetId === '__INVITATION__'
+      || (this.form.budgetId === '__MANUAL__' && !!this.form.manualBudgetRef.trim())
+      || (!!this.form.budgetId && this.form.budgetId !== '__MANUAL__');
+    const hasLocation = this.cities().length > 0
+      ? (this.selectedCities().some(c => c !== 'Autre') || (this.selectedCities().includes('Autre') && !!this.otherLocation.trim()))
+      : !!this.form.location.trim();
+    return this.form.object.trim() && hasLocation
+      && this.form.departureDate && this.form.returnDate
       && this.form.fundId && hasBudget;
   }
 
@@ -673,11 +752,15 @@ export class MissionFormComponent implements OnInit {
       firstValueFrom(this.api.getFinancingFunds()),
       firstValueFrom(this.api.getBudgets()),
       firstValueFrom(activitiesReq),
-    ]).then(([personnel, funds, budgets, activityRefs]) => {
+      firstValueFrom(this.api.getConfigListByType('cities')).catch(() => []),
+      firstValueFrom(this.api.getConfigListByType('transport_modes')).catch(() => []),
+    ]).then(([personnel, funds, budgets, activityRefs, citiesData, transportData]) => {
       this.personnel.set(personnel);
       this.funds.set(funds);
       this.budgets.set(budgets.filter((b: any) => ['approved', 'mission_cop'].includes(b.status)));
       this.activityRefs.set(activityRefs);
+      this.cities.set((citiesData as any[]).map((i: any) => i.value));
+      this.transportModes.set((transportData as any[]).map((i: any) => i.value));
     }).catch(() => {});
 
     if (id) {
@@ -687,16 +770,32 @@ export class MissionFormComponent implements OnInit {
           const depStr = m.departureDate?.substring(0, 10) ?? '';
           const retStr = m.returnDate?.substring(0, 10) ?? '';
           const resStr = m.resumeDate?.substring(0, 10) ?? '';
+          const isManualBudget = !m.isInvitation && !m.budgetId && !!m.manualBudgetRef;
           this.form = {
             object: m.object,
-            location: m.location,
+            location: m.location ?? '',
             departureDate: depStr,
             returnDate: retStr,
             resumeDate: resStr,
             fundId: m.fundId ?? '',
-            budgetId: m.isInvitation ? '__INVITATION__' : (m.budgetId ?? ''),
+            budgetId: m.isInvitation ? '__INVITATION__' : (isManualBudget ? '__MANUAL__' : (m.budgetId ?? '')),
             activityRefId: m.activityRefId ?? '',
+            transportMode: m.transportMode ?? '',
+            manualBudgetRef: m.manualBudgetRef ?? '',
           };
+          // Populate city multi-select from stored location string
+          if (m.location) {
+            const parts = m.location.split(',').map((s: string) => s.trim()).filter(Boolean);
+            const knownCities = this.cities();
+            if (knownCities.length > 0) {
+              const recognized = parts.filter((p: string) => knownCities.includes(p));
+              const others = parts.filter((p: string) => !knownCities.includes(p));
+              if (others.length > 0) { recognized.push('Autre'); this.otherLocation = others.join(', '); }
+              this.selectedCities.set(recognized);
+            } else {
+              this.selectedCities.set(parts);
+            }
+          }
           this.participantIds.set(m.participants?.map((mp: any) => mp.personnelId) ?? []);
           this.departureDateObj = this.strToDate(depStr);
           this.returnDateObj = this.strToDate(retStr);
@@ -716,17 +815,26 @@ export class MissionFormComponent implements OnInit {
 
   private buildPayload() {
     const isInvitation = this.form.budgetId === '__INVITATION__';
+    const isManualBudget = this.form.budgetId === '__MANUAL__';
+    const locationParts = this.cities().length > 0
+      ? this.selectedCities().filter(c => c !== 'Autre')
+      : [this.form.location.trim()];
+    if (this.cities().length > 0 && this.selectedCities().includes('Autre') && this.otherLocation.trim())
+      locationParts.push(this.otherLocation.trim());
+    const location = locationParts.join(', ') || this.form.location.trim();
     return {
-      object:         this.form.object.trim(),
-      location:       this.form.location.trim(),
-      departureDate:  this.form.departureDate,
-      returnDate:     this.form.returnDate,
-      resumeDate:     this.form.resumeDate,
-      fundId:         this.form.fundId,
-      budgetId:       isInvitation ? undefined : (this.form.budgetId || undefined),
-      activityRefId:  this.form.activityRefId || undefined,
-      participantIds: this.participantIds(),
+      object:          this.form.object.trim(),
+      location,
+      departureDate:   this.form.departureDate,
+      returnDate:      this.form.returnDate,
+      resumeDate:      this.form.resumeDate,
+      fundId:          this.form.fundId,
+      budgetId:        (isInvitation || isManualBudget) ? undefined : (this.form.budgetId || undefined),
+      activityRefId:   this.form.activityRefId || undefined,
+      participantIds:  this.participantIds(),
       isInvitation,
+      transportMode:   this.form.transportMode || undefined,
+      manualBudgetRef: isManualBudget ? (this.form.manualBudgetRef.trim() || undefined) : undefined,
     };
   }
 
@@ -769,47 +877,11 @@ export class MissionFormComponent implements OnInit {
     }
   }
 
-  onTpmRejectClick() {
-    if (this.tpmDecision === 'rejected') {
-      this.tpmReview();
-    } else {
-      this.tpmDecision = 'rejected';
-    }
-  }
-
   onCopRejectClick() {
     if (this.copDecision === 'cancelled') {
       this.copReview();
     } else {
       this.copDecision = 'cancelled';
-    }
-  }
-
-  async tpmReview() {
-    const id = this.route.snapshot.params['id'];
-    if (!id || !this.tpmDecision) return;
-    if (this.tpmDecision === 'rejected' && !this.tpmRejectionReason.trim()) {
-      this.snack.open('Veuillez saisir un motif de rejet', 'OK', { duration: 2500 });
-      return;
-    }
-    this.saving.set(true);
-    try {
-      const wasApproved = this.tpmDecision === 'approved';
-      const updated = await firstValueFrom(this.api.tpmReviewMission(id, {
-        decision: wasApproved ? 'pending_cop' : 'draft',
-        rejectionReason: this.tpmRejectionReason || undefined,
-      }));
-      this.mission.set(updated);
-      this.tpmDecision = '';
-      this.tpmRejectionReason = '';
-      this.snack.open(
-        wasApproved ? 'Mission transmise au COP' : 'Mission renvoyée en brouillon',
-        'OK', { duration: 2500 }
-      );
-    } catch (err: any) {
-      this.showError('Erreur avis TPM', err);
-    } finally {
-      this.saving.set(false);
     }
   }
 

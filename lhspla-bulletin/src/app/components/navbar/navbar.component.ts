@@ -81,6 +81,10 @@ import { ENTITIES } from '../../models/bulletin.models';
           <mat-icon>flight_takeoff</mat-icon> Missions
         </a>
 
+        <button mat-button [matMenuTriggerFor]="stockMenu">
+          <mat-icon>inventory_2</mat-icon> Stock <mat-icon class="arrow">arrow_drop_down</mat-icon>
+        </button>
+
         <button mat-button [matMenuTriggerFor]="adminMenu" *ngIf="auth.isAdmin()">
           <mat-icon>admin_panel_settings</mat-icon> Admin <mat-icon class="arrow">arrow_drop_down</mat-icon>
         </button>
@@ -134,6 +138,19 @@ import { ENTITIES } from '../../models/bulletin.models';
       <a mat-menu-item routerLink="/dashboard/financial">
         <mat-icon>bar_chart</mat-icon> Gestion financière
       </a>
+      <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/brief">
+        <mat-icon>newspaper</mat-icon> Weekly Operations Brief
+      </a>
+    </mat-menu>
+
+    <mat-menu #stockMenu="matMenu">
+      <a mat-menu-item routerLink="/stock/import" *ngIf="auth.isQadMember()">
+        <mat-icon>upload_file</mat-icon> Importer État de stock
+      </a>
+      <a mat-menu-item routerLink="/stock/consult">
+        <mat-icon>inventory_2</mat-icon> Consulter État de stock
+      </a>
     </mat-menu>
 
     <mat-menu #entitiesMenu="matMenu">
@@ -149,11 +166,17 @@ import { ENTITIES } from '../../models/bulletin.models';
           <span>Dashboard {{e.code}}</span>
         </a>
       </ng-container>
+      <ng-container *ngIf="auth.isEntityMember() && auth.entityCode() === 'QAD'">
+        <mat-divider></mat-divider>
+        <a mat-menu-item routerLink="/stock/import"><mat-icon>upload_file</mat-icon> Importer État de stock</a>
+      </ng-container>
     </mat-menu>
 
     <mat-menu #entityFinanceMenu="matMenu">
       <a mat-menu-item routerLink="/budgets"><mat-icon>account_balance_wallet</mat-icon> Budgets</a>
       <a mat-menu-item routerLink="/budget-recalls"><mat-icon>attach_file</mat-icon> Rappels & Justificatifs</a>
+      <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/brief"><mat-icon>newspaper</mat-icon> Weekly Operations Brief</a>
     </mat-menu>
 
     <mat-menu #financeMenu="matMenu">
@@ -161,6 +184,10 @@ import { ENTITIES } from '../../models/bulletin.models';
       <a mat-menu-item routerLink="/budget-recalls"><mat-icon>attach_file</mat-icon> Rappels & Justificatifs</a>
       <mat-divider></mat-divider>
       <a mat-menu-item routerLink="/admin/cost-items"><mat-icon>list_alt</mat-icon> Grille de coûts</a>
+      <a mat-menu-item routerLink="/admin/config-lists"><mat-icon>format_list_bulleted</mat-icon> Listes configurables</a>
+      <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/stock/consult"><mat-icon>inventory_2</mat-icon> Consulter État de stock</a>
+      <a mat-menu-item routerLink="/brief"><mat-icon>newspaper</mat-icon> Weekly Operations Brief</a>
       <mat-divider></mat-divider>
       <a mat-menu-item routerLink="/admin/settings"><mat-icon>tune</mat-icon> Paramètres</a>
     </mat-menu>
@@ -180,6 +207,10 @@ import { ENTITIES } from '../../models/bulletin.models';
       <mat-divider></mat-divider>
       <a mat-menu-item routerLink="/budget-recalls"><mat-icon>attach_file</mat-icon> Rappels & Justificatifs</a>
       <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/stock/consult"><mat-icon>inventory_2</mat-icon> Consulter État de stock</a>
+      <a mat-menu-item routerLink="/brief"><mat-icon>newspaper</mat-icon> Weekly Operations Brief</a>
+      <mat-divider></mat-divider>
+      <a mat-menu-item routerLink="/admin/config-lists"><mat-icon>format_list_bulleted</mat-icon> Listes configurables</a>
       <a mat-menu-item routerLink="/admin/settings"><mat-icon>tune</mat-icon> Paramètres</a>
     </mat-menu>
 
@@ -265,6 +296,21 @@ import { ENTITIES } from '../../models/bulletin.models';
         </a>
       </div>
 
+      <!-- Stock & Brief (visible à tous) -->
+      <div class="drawer-section">
+        <span class="drawer-section-label">Opérations</span>
+        <a class="drawer-link" routerLink="/stock/import" routerLinkActive="drawer-active"
+           *ngIf="auth.isQadMember()" (click)="closeMenu()">
+          <mat-icon>upload_file</mat-icon> Importer État de stock
+        </a>
+        <a class="drawer-link" routerLink="/stock/consult" routerLinkActive="drawer-active" (click)="closeMenu()">
+          <mat-icon>inventory_2</mat-icon> Consulter État de stock
+        </a>
+        <a class="drawer-link" routerLink="/brief" routerLinkActive="drawer-active" (click)="closeMenu()">
+          <mat-icon>newspaper</mat-icon> Weekly Operations Brief
+        </a>
+      </div>
+
       <!-- Finance -->
       <div class="drawer-section">
         <span class="drawer-section-label">Finance</span>
@@ -277,6 +323,10 @@ import { ENTITIES } from '../../models/bulletin.models';
         <a class="drawer-link" routerLink="/admin/cost-items" routerLinkActive="drawer-active"
            *ngIf="auth.isAdminFinance() || auth.isAdmin()" (click)="closeMenu()">
           <mat-icon>list_alt</mat-icon> Grille de coûts
+        </a>
+        <a class="drawer-link" routerLink="/admin/config-lists" routerLinkActive="drawer-active"
+           *ngIf="auth.isAdminFinance() || auth.isAdmin()" (click)="closeMenu()">
+          <mat-icon>format_list_bulleted</mat-icon> Listes configurables
         </a>
       </div>
 

@@ -1,6 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+
+// Prisma returns BigInt for Int8 columns — patch before any JSON serialization
+(BigInt.prototype as any).toJSON = function () { return Number(this); };
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
@@ -13,6 +16,10 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new GlobalExceptionFilter());
+
+  // Augmenter la limite du body JSON pour permettre l'upload du PDF base64 (~300KB typique)
+  app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
   app.enableCors({
     origin: process.env.FRONTEND_URL ?? 'http://localhost:4201',

@@ -45,9 +45,13 @@ export const ATELIER_ROWS: BudgetRow[] = [
   { rowKey: 'perdiems_total', label: 'Total Full perdiems', type: 'total_section', formula: ['perdiems_st1','perdiems_st2'] },
 
   { rowKey: 'forfait_carb_header', label: 'FORFAIT CARBURANT', type: 'section_header', num: 4 },
+  { rowKey: 'forfait_carb_sub_npsp', label: 'Participants NPSP', type: 'sub_header' },
+  { rowKey: 'forfait_carb_npsp', label: 'Forfait carburant Participants NPSP', type: 'item', editDesignation: true },
+  { rowKey: 'forfait_carb_npsp_st', label: 'Sous total 1 : Participants NPSP', type: 'subtotal', formula: ['forfait_carb_npsp'] },
   { rowKey: 'forfait_carb_sub1', label: 'Autres participants', type: 'sub_header' },
   { rowKey: 'forfait_carb_item', label: 'Forfait carburant', type: 'item', editDesignation: true },
-  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_autres_st', label: 'Sous total 2 : Autres participants', type: 'subtotal', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_npsp_st', 'forfait_carb_autres_st'] },
 
   { rowKey: 'carburant_header', label: 'CARBURANT', type: 'section_header', num: 5 },
   { rowKey: 'carburant_peage1', label: 'Péage (A/R) 1', type: 'item', editDesignation: true },
@@ -130,9 +134,13 @@ export const MISSION_TERRAIN_ROWS: BudgetRow[] = [
   { rowKey: 'perdiems_total', label: 'Total Full perdiems', type: 'total_section', formula: ['perdiems_st1','perdiems_st2'] },
 
   { rowKey: 'forfait_carb_header', label: 'FORFAIT CARBURANT', type: 'section_header', num: 3 },
+  { rowKey: 'forfait_carb_sub_npsp', label: 'Participants NPSP', type: 'sub_header' },
+  { rowKey: 'forfait_carb_npsp', label: 'Forfait carburant Participants NPSP', type: 'item', editDesignation: true },
+  { rowKey: 'forfait_carb_npsp_st', label: 'Sous total 1 : Participants NPSP', type: 'subtotal', formula: ['forfait_carb_npsp'] },
   { rowKey: 'forfait_carb_sub1', label: 'Autres participants', type: 'sub_header' },
   { rowKey: 'forfait_carb_item', label: 'Forfait carburant', type: 'item', editDesignation: true },
-  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_autres_st', label: 'Sous total 2 : Autres participants', type: 'subtotal', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_npsp_st', 'forfait_carb_autres_st'] },
 
   { rowKey: 'carburant_header', label: 'CARBURANT', type: 'section_header', num: 4 },
   { rowKey: 'carburant_peage1', label: 'Péage (A/R) 1', type: 'item', editDesignation: true },
@@ -182,9 +190,13 @@ export const MISSION_TERRAIN_ROWS: BudgetRow[] = [
 // ── APPUIS ────────────────────────────────────────────────────────────────────
 export const APPUIS_ROWS: BudgetRow[] = [
   { rowKey: 'forfait_carb_header', label: 'FORFAIT CARBURANT', type: 'section_header', num: 4 },
+  { rowKey: 'forfait_carb_sub_npsp', label: 'Participants NPSP', type: 'sub_header' },
+  { rowKey: 'forfait_carb_npsp', label: 'Forfait carburant Participants NPSP', type: 'item', editDesignation: true },
+  { rowKey: 'forfait_carb_npsp_st', label: 'Sous total 1 : Participants NPSP', type: 'subtotal', formula: ['forfait_carb_npsp'] },
   { rowKey: 'forfait_carb_sub1', label: 'Autres participants', type: 'sub_header' },
   { rowKey: 'forfait_carb_item', label: 'Forfait carburant', type: 'item', editDesignation: true },
-  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_autres_st', label: 'Sous total 2 : Autres participants', type: 'subtotal', formula: ['forfait_carb_item'] },
+  { rowKey: 'forfait_carb_total', label: 'Total FORFAIT CARBURANT', type: 'total_section', formula: ['forfait_carb_npsp_st', 'forfait_carb_autres_st'] },
 
   { rowKey: 'appuis_header', label: 'APPUIS FINANCIERS', type: 'section_header', num: 7 },
   { rowKey: 'appuis_sub1', label: 'Autres Participants', type: 'sub_header' },
@@ -266,6 +278,7 @@ export const BUDGET_STATUS_LABELS: Record<string, { label: string; color: string
   approved:         { label: 'Approuvé',                   color: '#1F8A3C' },
   rejected:         { label: 'Rejeté',                     color: '#C00000' },
   archived:         { label: 'Archivé',                    color: '#999' },
+  cloture:          { label: 'Clôturé',                    color: '#4A1942' },
 };
 
 export function computeAmounts(rows: BudgetRow[], lineData: Record<string, { unitCost?: number | null; quantity?: number | null; frequency?: number | null }>): Record<string, number> {

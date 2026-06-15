@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
@@ -22,8 +24,14 @@ import { MissionsModule } from './missions/missions.module';
 import { N8nModule } from './n8n/n8n.module';
 import { PaymentRequestsModule } from './payment-requests/payment-requests.module';
 import { BudgetMemosModule } from './budget-memos/budget-memos.module';
+import { ConfigListsModule } from './config-lists/config-lists.module';
+import { StockModule } from './stock/stock.module';
+import { BriefModule } from './brief/brief.module';
+import { CompilationModule } from './compilation/compilation.module';
 
 @Module({
+  controllers: [AppController],
+  providers:   [AppService],
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
@@ -48,6 +56,10 @@ import { BudgetMemosModule } from './budget-memos/budget-memos.module';
     N8nModule,
     PaymentRequestsModule,
     BudgetMemosModule,
+    ConfigListsModule,
+    StockModule,
+    BriefModule,
+    CompilationModule,
   ],
 })
 export class AppModule {}

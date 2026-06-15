@@ -85,6 +85,7 @@ export class BudgetMemosService {
     userRoles: Role[],
   ) {
     await this.assertMemoEnabled();
+    if (!file) throw new BadRequestException('La pièce jointe est obligatoire pour un MEMO');
     if (!userRoles.some(r => MEMO_ALLOWED_ROLES.includes(r))) throw new ForbiddenException();
 
     const budget = await this.prisma.budgetProject.findUnique({ where: { id: budgetId } });

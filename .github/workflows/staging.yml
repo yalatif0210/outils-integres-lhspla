@@ -1,0 +1,179 @@
+name: 🧪 Deploy Staging
+
+on:
+  push:
+    branches: [develop]
+
+env:
+  REGISTRY: ghcr.io
+  APP_DIR: /home/markov/lhspla
+  API_IMAGE: ghcr.io/${{ github.repository }}/lhspla-api
+  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/lhspla-frontend
+
+jobs:
+  # ── Build & Push images ─────────────────────────────────────────────────────
+  build:
+    name: Build Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.API_IMAGE }}:staging
+            ${{ env.API_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.API_IMAGE }}:staging
+          cache-to:   type=inline
+
+      - name: Build & Push Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:staging
+            ${{ env.FRONTEND_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:staging
+          cache-to:   type=inline
+
+  # ── Deploy Staging ──────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    environment: staging
+
+    steps:
+      - name: Préparer VPS — cloner repo si absent, sinon pull
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            APP_DIR="/home/markov/lhspla"
+
+            # Créer réseaux Docker si absents
+            docker network create lhspla-prod-net 2>/dev/null || true
+            docker network create lhspla-stg-net  2>/dev/null || true
+
+            # Clone ou pull
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "▶ Repo existant — pull develop..."
+              git -C "$APP_DIR" fetch origin
+              git -C "$APP_DIR" checkout develop
+              git -C "$APP_DIR" pull origin develop
+            else
+              echo "▶ Clone initial du repo..."
+              git clone -b develop https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git "$APP_DIR"
+            fi
+
+      - name: Écrire .env.staging depuis les secrets GitHub
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            printf '%s\n' \
+              'GITHUB_REPOSITORY=${{ github.repository }}' \
+              'STG_DB_PASSWORD=${{ secrets.STG_DB_PASSWORD }}' \
+              'STG_JWT_SECRET=${{ secrets.STG_JWT_SECRET }}' \
+              'STG_JWT_REFRESH_SECRET=${{ secrets.STG_JWT_REFRESH_SECRET }}' \
+              'MISTRAL_API_KEY=${{ secrets.MISTRAL_API_KEY }}' \
+              'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' \
+              'MAIL_HOST=smtp.gmail.com' \
+              'MAIL_PORT=587' \
+              'MAIL_USER=' \
+              'MAIL_PASS=' \
+              'MAIL_FROM=LHSPLA Staging <noreply@lhspla.ci>' \
+              > /home/markov/lhspla/.env.staging
+            chmod 600 /home/markov/lhspla/.env.staging
+            echo "✅ .env.staging écrit ($(wc -l < /home/markov/lhspla/.env.staging) lignes)"
+
+      - name: Docker pull & up staging
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /home/markov/lhspla
+
+            # Login ghcr.io sur le VPS
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            docker compose -f docker-compose.staging.yml --env-file .env.staging pull
+            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --remove-orphans
+
+            # Seed idempotent
+            sleep 10
+            docker exec stg-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
+
+      - name: Health check staging (nginx → api)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "Attente démarrage staging (max 2 min)..."
+            for i in $(seq 1 24); do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                http://localhost:8080/api/health 2>/dev/null || echo "000")
+              echo "Tentative $i/24 — HTTP $STATUS"
+              [ "$STATUS" = "200" ] && { echo "✅ Staging opérationnel"; exit 0; }
+              sleep 5
+            done
+            echo "--- Logs stg-api (debug) ---"
+            docker logs stg-api --tail 30
+            echo "❌ Staging non disponible après 2 minutes"
+            exit 1
+
+  # ── Promote develop → main ──────────────────────────────────────────────────
+  promote:
+    name: Merge develop → main
+    runs-on: ubuntu-latest
+    needs: deploy
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Merge develop dans main et push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin develop
+          git merge origin/develop --no-ff -m "chore: auto-merge develop → main après staging ✅"
+          git push origin main
+          echo "✅ main aligné sur develop — pipeline prod déclenché"

@@ -25,9 +25,11 @@ import * as fs from 'fs';
 export class CreateMissionDto {
   @IsString() object: string;
   @IsString() location: string;
+  @IsOptional() @IsString() transportMode?: string;
+  @IsOptional() @IsString() manualBudgetRef?: string;
   @IsDateString() departureDate: string;
   @IsDateString() returnDate: string;
-  @IsDateString() resumeDate: string;
+  @IsOptional() @IsDateString() resumeDate?: string;
   @IsString() fundId: string;
   @IsOptional() @IsString() budgetId?: string;
   @IsOptional() @IsString() activityRefId?: string;
@@ -38,6 +40,8 @@ export class CreateMissionDto {
 export class UpdateMissionDto {
   @IsOptional() @IsString() object?: string;
   @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsString() transportMode?: string;
+  @IsOptional() @IsString() manualBudgetRef?: string;
   @IsOptional() @IsDateString() departureDate?: string;
   @IsOptional() @IsDateString() returnDate?: string;
   @IsOptional() @IsDateString() resumeDate?: string;
@@ -72,6 +76,13 @@ const MISSION_STAFF_ROLES: Role[] = [
 
 function hasRole(userRoles: Role[], ...roles: Role[]): boolean {
   return roles.some(r => userRoles.includes(r));
+}
+
+function nextWorkingDay(date: Date): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d;
 }
 
 // ─── Service ─────────────────────────────────────────────────────────────────
@@ -198,9 +209,11 @@ export class MissionsService {
         initiatorId,
         object: dto.object,
         location: dto.location,
+        transportMode: dto.transportMode ?? null,
+        manualBudgetRef: dto.manualBudgetRef ?? null,
         departureDate: new Date(dto.departureDate),
         returnDate: new Date(dto.returnDate),
-        resumeDate: new Date(dto.resumeDate),
+        resumeDate: dto.resumeDate ? new Date(dto.resumeDate) : nextWorkingDay(new Date(dto.returnDate)),
         fundId: dto.fundId,
         budgetId: dto.budgetId ?? null,
         activityRefId: dto.activityRefId ?? null,
@@ -239,6 +252,8 @@ export class MissionsService {
     const data: any = {};
     if (dto.object !== undefined) data.object = dto.object;
     if (dto.location !== undefined) data.location = dto.location;
+    if (dto.transportMode !== undefined) data.transportMode = dto.transportMode || null;
+    if (dto.manualBudgetRef !== undefined) data.manualBudgetRef = dto.manualBudgetRef || null;
     if (dto.departureDate !== undefined) data.departureDate = new Date(dto.departureDate);
     if (dto.returnDate !== undefined) data.returnDate = new Date(dto.returnDate);
     if (dto.resumeDate !== undefined) data.resumeDate = new Date(dto.resumeDate);
@@ -298,14 +313,9 @@ export class MissionsService {
       );
     }
 
-    // COP s'auto-approuve ; admin_tpm saute l'étape TPM (ils sont le TPM) → pending_cop
-    const isCop    = hasRole(userRoles, Role.chief_of_party);
-    const isTpm    = hasRole(userRoles, Role.admin_tpm);
-    const newStatus = isCop
-      ? MissionStatus.cop_approved
-      : isTpm
-        ? MissionStatus.pending_cop
-        : MissionStatus.pending_tpm;
+    // COP s'auto-approuve ; tous les autres → pending_cop directement
+    const isCop = hasRole(userRoles, Role.chief_of_party);
+    const newStatus = isCop ? MissionStatus.cop_approved : MissionStatus.pending_cop;
 
     const updated = await this.prisma.missionRequest.update({
       where: { id },
@@ -324,29 +334,17 @@ export class MissionsService {
       for (const u of adPhones) {
         await this.n8n.onMissionCopApproved({ phone: u.phone, firstName: u.firstName, missionTitle: mission.object });
       }
-    } else if (isTpm) {
+    } else {
       await this.notifyByRole(
         [Role.chief_of_party],
         'MISSION_SUBMITTED',
-        'Demande de mission en attente de votre avis',
-        `Une demande de mission "${mission.object}" (soumise par le TPM) est en attente de votre avis COP.`,
+        'Demande de mission à valider',
+        `Une demande de mission "${mission.object}" est en attente de votre avis COP.`,
         { missionId: id },
       );
-      const copPhonesT = await this.getRolePhones(Role.chief_of_party);
-      for (const u of copPhonesT) {
+      const copPhones = await this.getRolePhones(Role.chief_of_party);
+      for (const u of copPhones) {
         await this.n8n.onMissionTpmApproved({ phone: u.phone, firstName: u.firstName, missionTitle: mission.object });
-      }
-    } else {
-      await this.notifyByRole(
-        [Role.admin_tpm],
-        'MISSION_SUBMITTED',
-        'Demande de mission à viser',
-        `Une demande de mission "${mission.object}" est en attente de votre avis TPM.`,
-        { missionId: id },
-      );
-      const tpmPhones = await this.getRolePhones(Role.admin_tpm);
-      for (const u of tpmPhones) {
-        await this.n8n.onMissionSubmitted({ phone: u.phone, firstName: u.firstName, missionTitle: mission.object });
       }
     }
 
@@ -755,7 +753,6 @@ export class MissionsService {
         ...(excludeMissionId ? { id: { not: excludeMissionId } } : {}),
         status: {
           in: [
-            MissionStatus.pending_tpm,
             MissionStatus.pending_cop,
             MissionStatus.cop_approved,
             MissionStatus.pending_dg,
@@ -763,7 +760,7 @@ export class MissionsService {
           ],
         },
         departureDate: { lte: returnDate },
-        returnDate:    { gte: departureDate },
+        returnDate:    { gt: departureDate },
         participants:  { some: { personnelId: { in: participantIds } } },
       },
       include: {

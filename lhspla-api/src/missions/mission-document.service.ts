@@ -72,13 +72,14 @@ export class MissionDocumentService {
 
     // ODM : dates en lettres (LUNDI 17 NOVEMBRE 2025)
     const odmData = {
-      objet:        mission.object.toUpperCase(),
-      destination:  mission.location.toUpperCase(),
-      dateDepart:   dateLetters(depDate),
-      dateRetour:   dateLetters(retDate),
-      dateReprise:  dateLetters(resDate),
-      imputation:   imputation.toUpperCase(),
-      participants: participantList,
+      objet:           mission.object.toUpperCase(),
+      destination:     mission.location.toUpperCase(),
+      dateDepart:      dateLetters(depDate),
+      dateRetour:      dateLetters(retDate),
+      dateReprise:     dateLetters(resDate),
+      moyenTransport:  mission.transportMode ? mission.transportMode.toUpperCase() : '',
+      imputation:      imputation.toUpperCase(),
+      participants:    participantList,
     };
 
     const [dmBuf, odmBuf] = await Promise.all([

@@ -73,3 +73,11 @@ export const settingsGuard: CanActivateFn = () => {
   router.navigate(['/home']);
   return false;
 };
+
+export const stockImportGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (auth.isQadMember()) return true;
+  router.navigate(['/home']);
+  return false;
+};
