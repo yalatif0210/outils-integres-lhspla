@@ -5,7 +5,8 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [
-      { "include": "missions/templates/*.docx", "watchAssets": true }
+      { "include": "missions/templates/*.docx", "watchAssets": true },
+      { "include": "brief/templates/*", "watchAssets": true }
     ]
   }
 }

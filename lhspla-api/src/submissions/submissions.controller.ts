@@ -76,6 +76,7 @@ export class SubmissionsController {
 
   private assertCanEdit(user: any, entityCode: string) {
     if (user.roles?.includes(Role.admin_system)) return;
+    if (user.roles?.includes(Role.super_admin)) return;
     if (user.entityCode === entityCode) return;
     if (user.roles?.includes(Role.chief_of_party)) throw new ForbiddenException('Le Chief of Party ne peut pas modifier les saisies');
     throw new ForbiddenException('Vous ne pouvez modifier que les saisies de votre entité');

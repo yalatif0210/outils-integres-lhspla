@@ -3,9 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AppConfigService } from '../app-config/app-config.service';
 import { N8nService } from '../n8n/n8n.service';
-import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, IsNumber } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { BudgetType, BudgetStatus, Role } from '@prisma/client';
+import * as path from 'path';
+import * as fs from 'fs';
+import { PassThrough } from 'stream';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { ZipArchive } = require('archiver'); // archiver v8 : new ZipArchive() au lieu de archiver('zip')
 
 export class BudgetLineDto {
   @IsString() rowKey: string;
@@ -24,6 +29,7 @@ export class CreateBudgetDto {
   @IsOptional() @IsNumber() exchangeRate?: number;
   @IsOptional() @IsNumber() transferFeeRate?: number;
   @IsOptional() @IsNumber() totalAmount?: number;
+  @IsOptional() @IsDateString() probableExecutionDate?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BudgetLineDto) lines?: BudgetLineDto[];
 }
 
@@ -34,22 +40,26 @@ export class UpdateBudgetDto {
   @IsOptional() @IsNumber() exchangeRate?: number;
   @IsOptional() @IsNumber() transferFeeRate?: number;
   @IsOptional() @IsNumber() totalAmount?: number;
+  @IsOptional() @IsDateString() probableExecutionDate?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => BudgetLineDto) lines?: BudgetLineDto[];
 }
 
 export class FinanceReviewDto {
   @IsEnum(['finance_reviewed', 'rejected']) decision: 'finance_reviewed' | 'rejected';
   @IsOptional() @IsString() rejectionReason?: string;
+  @IsOptional() @IsString() rejectionComment?: string;
 }
 
 export class ReviewBudgetDto {
   @IsEnum(['tpm_approved', 'rejected']) decision: 'tpm_approved' | 'rejected';
   @IsOptional() @IsString() rejectionReason?: string;
+  @IsOptional() @IsString() rejectionComment?: string;
 }
 
 export class COPReviewBudgetDto {
   @IsEnum(['approved', 'rejected']) decision: 'approved' | 'rejected';
   @IsOptional() @IsString() rejectionReason?: string;
+  @IsOptional() @IsString() rejectionComment?: string;
 }
 
 // Rôles pouvant voir tous les budgets
@@ -202,12 +212,13 @@ export class BudgetProjectsService {
           entityCode,
           budgetType: dto.budgetType,
           title: dto.title,
-          fundId: dto.fundId,
-          activityReferenceId: dto.activityReferenceId ?? null,
+          fund: { connect: { id: dto.fundId } },
+          activityReference: dto.activityReferenceId ? { connect: { id: dto.activityReferenceId } } : undefined,
           exchangeRate,
           transferFeeRate,
           totalAmount: dto.totalAmount ?? 0,
           budgetNumber,
+          probableExecutionDate: dto.probableExecutionDate ? new Date(dto.probableExecutionDate) : null,
           lines: dto.lines?.length
             ? {
                 createMany: {
@@ -248,6 +259,9 @@ export class BudgetProjectsService {
     if (dto.exchangeRate !== undefined) data.exchangeRate = dto.exchangeRate;
     if (dto.transferFeeRate !== undefined) data.transferFeeRate = dto.transferFeeRate;
     if (dto.totalAmount !== undefined) data.totalAmount = dto.totalAmount;
+    if (dto.probableExecutionDate !== undefined) {
+      data.probableExecutionDate = dto.probableExecutionDate ? new Date(dto.probableExecutionDate) : null;
+    }
 
     if (dto.lines !== undefined) {
       await this.prisma.budgetLine.deleteMany({ where: { budgetId: id } });
@@ -325,18 +339,19 @@ export class BudgetProjectsService {
     }
 
     if (dto.decision === 'rejected') {
+      const fullReason = this.buildRejectionText(dto.rejectionReason, dto.rejectionComment);
       await this.prisma.budgetProject.update({
         where: { id },
         data: {
           status: BudgetStatus.draft,
           financeReviewedAt: new Date(),
           financeReviewedById: financeUserId,
-          rejectionReason: dto.rejectionReason ?? null,
+          rejectionReason: fullReason || null,
         },
       });
-      await this.notifications.notifyBudgetReturnedToDraft(budget.entityCode, budget.budgetType, budget.title, id, dto.rejectionReason!, 'Finance');
+      await this.notifications.notifyBudgetReturnedToDraft(budget.entityCode, budget.budgetType, budget.title, id, fullReason, 'Finance');
       const ep = await this.getEntityPhone(budget.entityCode);
-      if (ep) await this.n8n.onBudgetRejected({ phone: ep.phone, firstName: ep.firstName, budgetTitle: budget.title, reason: dto.rejectionReason! });
+      if (ep) await this.n8n.onBudgetRejected({ phone: ep.phone, firstName: ep.firstName, budgetTitle: budget.title, reason: fullReason });
     } else {
       await this.prisma.budgetProject.update({
         where: { id },
@@ -364,18 +379,19 @@ export class BudgetProjectsService {
     }
 
     if (dto.decision === 'rejected') {
+      const fullReason = this.buildRejectionText(dto.rejectionReason, dto.rejectionComment);
       await this.prisma.budgetProject.update({
         where: { id },
         data: {
           status: BudgetStatus.draft,
           tpmReviewedAt: new Date(),
           tpmReviewedById: tpmUserId,
-          rejectionReason: dto.rejectionReason ?? null,
+          rejectionReason: fullReason || null,
         },
       });
-      await this.notifications.notifyBudgetReturnedToDraft(budget.entityCode, budget.budgetType, budget.title, id, dto.rejectionReason!, 'TPM');
+      await this.notifications.notifyBudgetReturnedToDraft(budget.entityCode, budget.budgetType, budget.title, id, fullReason, 'TPM');
       const ep = await this.getEntityPhone(budget.entityCode);
-      if (ep) await this.n8n.onBudgetRejected({ phone: ep.phone, firstName: ep.firstName, budgetTitle: budget.title, reason: dto.rejectionReason! });
+      if (ep) await this.n8n.onBudgetRejected({ phone: ep.phone, firstName: ep.firstName, budgetTitle: budget.title, reason: fullReason });
     } else {
       await this.prisma.budgetProject.update({
         where: { id },
@@ -403,19 +419,19 @@ export class BudgetProjectsService {
     }
 
     if (dto.decision === 'rejected') {
+      const fullReason = this.buildRejectionText(dto.rejectionReason, dto.rejectionComment);
       await this.prisma.budgetProject.update({
         where: { id },
         data: {
-          status: BudgetStatus.rejected,
+          status: BudgetStatus.draft,
           reviewedAt: new Date(),
           reviewedById: copUserId,
-          rejectionReason: dto.rejectionReason ?? null,
-          rejectedAt: new Date(),
+          rejectionReason: fullReason || null,
         },
       });
-      await this.notifications.notifyBudgetRejected(budget.entityCode, budget.budgetType, budget.title, id, dto.rejectionReason!);
+      await this.notifications.notifyBudgetReturnedToDraft(budget.entityCode, budget.budgetType, budget.title, id, fullReason, 'COP');
       const epRej = await this.getEntityPhone(budget.entityCode);
-      if (epRej) await this.n8n.onBudgetRejected({ phone: epRej.phone, firstName: epRej.firstName, budgetTitle: budget.title, reason: dto.rejectionReason! });
+      if (epRej) await this.n8n.onBudgetRejected({ phone: epRej.phone, firstName: epRej.firstName, budgetTitle: budget.title, reason: fullReason });
     } else {
       await this.prisma.budgetProject.update({
         where: { id },
@@ -482,6 +498,13 @@ export class BudgetProjectsService {
     return { filePath: budget.tdrFilePath, ext: budget.tdrFileExt ?? 'pdf' };
   }
 
+  private buildRejectionText(reason?: string, comment?: string): string {
+    const parts: string[] = [];
+    if (reason) parts.push(reason);
+    if (comment?.trim()) parts.push(`Commentaire : ${comment.trim()}`);
+    return parts.join(' — ');
+  }
+
   private async getEntityPhone(entityCode: string): Promise<{ phone: string; firstName: string } | null> {
     const user = await this.prisma.user.findFirst({
       where: { entityCode, isEntityResponsible: true, isActive: true, phone: { not: null } },
@@ -501,5 +524,177 @@ export class BudgetProjectsService {
   private async getConfigRate(key: string, defaultValue: number): Promise<number> {
     const cfg = await this.prisma.appConfig.findUnique({ where: { key } });
     return cfg ? parseFloat(cfg.value) : defaultValue;
+  }
+
+  // ── Clôture budget ─────────────────────────────────────────────────────────
+
+  async cloturer(id: string, userId: string, roles: Role[]) {
+    const allowed: Role[] = [Role.admin_finance, Role.super_admin];
+    if (!roles.some(r => allowed.includes(r))) {
+      throw new ForbiddenException('Clôture réservée à admin_finance et super_admin');
+    }
+
+    const budget = await this.prisma.budgetProject.findUnique({ where: { id } });
+    if (!budget) throw new NotFoundException('Budget introuvable');
+    if (budget.status === BudgetStatus.cloture) {
+      throw new BadRequestException('Ce budget est déjà clôturé');
+    }
+
+    return this.prisma.budgetProject.update({
+      where: { id },
+      data: {
+        previousStatus: budget.status,
+        status:         BudgetStatus.cloture,
+        closedAt:       new Date(),
+        closedById:     userId,
+      },
+    });
+  }
+
+  async declassifier(id: string, userId: string, roles: Role[]) {
+    if (!roles.includes(Role.super_admin)) {
+      throw new ForbiddenException('Déclassification réservée au super_admin');
+    }
+
+    const budget = await this.prisma.budgetProject.findUnique({ where: { id } });
+    if (!budget) throw new NotFoundException('Budget introuvable');
+    if (budget.status !== BudgetStatus.cloture) {
+      throw new BadRequestException('Ce budget n\'est pas clôturé');
+    }
+    if (!budget.previousStatus) {
+      throw new BadRequestException('Statut précédent inconnu — déclassification impossible');
+    }
+
+    return this.prisma.budgetProject.update({
+      where: { id },
+      data: {
+        status:         budget.previousStatus,
+        previousStatus: null,
+        closedAt:       null,
+        closedById:     null,
+      },
+    });
+  }
+
+  // ── Archive ZIP ────────────────────────────────────────────────────────────
+
+  async generateArchiveZip(id: string, roles: Role[], pdfBuffer?: Buffer): Promise<{ buffer: Buffer; filename: string }> {
+    const allowed: Role[] = [Role.admin_finance, Role.super_admin];
+    if (!roles.some(r => allowed.includes(r))) {
+      throw new ForbiddenException('Téléchargement réservé à admin_finance et super_admin');
+    }
+
+    const budget = await this.prisma.budgetProject.findUnique({
+      where: { id },
+      include: {
+        paymentRequests: {
+          include: { proofs: true },
+        },
+        memos:      true,
+        tdrHistory: { orderBy: { uploadedAt: 'desc' }, take: 1 },
+      },
+    });
+
+    if (!budget) throw new NotFoundException('Budget introuvable');
+    if (budget.status !== BudgetStatus.cloture) {
+      throw new BadRequestException('L\'archive ZIP est disponible uniquement pour les budgets clôturés');
+    }
+
+    const ref = budget.budgetNumber ?? id;
+    const date = new Date().toISOString().slice(0, 10);
+    const zipName = `Budget_${ref}_archive_${date}.zip`;
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      const pass    = new PassThrough();
+      const archive = new ZipArchive({ zlib: { level: 6 } });
+
+      // Collecter les données via un PassThrough pipé — pattern fiable avec archiver
+      pass.on('data',  (chunk: Buffer) => chunks.push(chunk));
+      pass.on('end',   () => resolve(Buffer.concat(chunks)));
+      pass.on('error', reject);
+
+      archive.on('warning', (err: any) => {
+        if (err.code !== 'ENOENT') reject(err);
+        // ENOENT = fichier manquant → ignoré silencieusement
+      });
+      archive.on('error', reject);
+      archive.pipe(pass);
+
+      // 0 — PDF du budget (généré côté client, transmis en base64)
+      if (pdfBuffer && pdfBuffer.length > 0) {
+        archive.append(pdfBuffer, { name: `Budget_${ref}.pdf` });
+      }
+
+      const addFile = (filePath: string | null | undefined, archiveName: string) => {
+        if (!filePath) return;
+        const abs = path.isAbsolute(filePath)
+          ? filePath
+          : path.join(process.cwd(), filePath);
+        if (fs.existsSync(abs)) {
+          archive.file(abs, { name: archiveName });
+        }
+      };
+
+      // 1 — TDR (dernier uploadé)
+      const tdr = budget.tdrHistory[0];
+      if (tdr) {
+        const ext = tdr.fileExt || 'pdf';
+        addFile(tdr.filePath, `TDR/TDR_${ref}.${ext}`);
+      } else if (budget.tdrFilePath) {
+        const ext = budget.tdrFileExt || 'pdf';
+        addFile(budget.tdrFilePath, `TDR/TDR_${ref}.${ext}`);
+      }
+
+      // 2 — Memos (pièces jointes)
+      for (const memo of budget.memos) {
+        if (memo.filePath && memo.fileName) {
+          addFile(memo.filePath, `Memos/${memo.id.slice(0, 8)}_${memo.fileName}`);
+        }
+      }
+
+      // 3 — Demandes de paiement + preuves
+      for (const pr of budget.paymentRequests) {
+        const prFolder = `Paiements/Demande_${pr.id.slice(0, 8)}`;
+        if (pr.filePath && pr.fileName) {
+          addFile(pr.filePath, `${prFolder}/${pr.fileName}`);
+        }
+        for (const proof of pr.proofs) {
+          if (proof.filePath && proof.fileName) {
+            addFile(proof.filePath, `${prFolder}/Preuves/${proof.fileName}`);
+          }
+        }
+      }
+
+      archive.finalize();
+    });
+
+    return { buffer, filename: zipName };
+  }
+
+  // Auto-clôture appelée depuis payment-requests.service après chaque preuve uploadée
+  async checkAndAutoCloturer(budgetId: string) {
+    const requests = await this.prisma.paymentRequest.findMany({
+      where: { budgetId },
+      include: { proofs: true },
+    });
+    if (requests.length === 0) return;
+
+    const allPaid     = requests.every(r => r.status === 'paid');
+    const allHaveProof = requests.every(r => r.proofs.length > 0);
+
+    if (allPaid && allHaveProof) {
+      const budget = await this.prisma.budgetProject.findUnique({ where: { id: budgetId } });
+      if (budget && budget.status !== BudgetStatus.cloture) {
+        await this.prisma.budgetProject.update({
+          where: { id: budgetId },
+          data: {
+            previousStatus: budget.status,
+            status:         BudgetStatus.cloture,
+            closedAt:       new Date(),
+          },
+        });
+      }
+    }
   }
 }

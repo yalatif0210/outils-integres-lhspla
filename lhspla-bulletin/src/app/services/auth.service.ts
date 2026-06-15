@@ -37,6 +37,7 @@ export class AuthService {
   readonly isChargeeTresorerie = computed(() => this.hasRole('chargee_tresorerie'));
   readonly canManagePayments = computed(() => this.hasAnyRole('admin_finance', 'chargee_tresorerie', 'super_admin'));
   readonly isAdminOrCOP = computed(() => this.isAdmin() || this.isCOP());
+  readonly isQadMember = computed(() => this.hasRole('entity_member') && this.entityCode() === 'QAD');
   readonly canTPMReview = computed(() => this.hasAnyRole('super_admin', 'admin_tpm'));
   readonly canCOPReview = computed(() => this.hasAnyRole('super_admin', 'chief_of_party'));
   readonly canReviewBudget = computed(() => this.canTPMReview() || this.canCOPReview() || this.isAdminFinance());

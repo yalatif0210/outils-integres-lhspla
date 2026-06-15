@@ -7,8 +7,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../services/api.service';
 import { AuthService } from '../../../services/auth.service';
@@ -26,7 +28,7 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
   imports: [
     CommonModule, FormsModule,
     MatCardModule, MatButtonModule, MatIconModule,
-    MatFormFieldModule, MatInputModule, MatChipsModule, MatSnackBarModule,
+    MatFormFieldModule, MatInputModule, MatSelectModule, MatChipsModule, MatSnackBarModule,
     BudgetRecallComponent,
   ],
   template: `
@@ -157,10 +159,20 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
             <div class="reject-form" *ngIf="showReject">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Motif du rejet (obligatoire)</mat-label>
-                <textarea matInput [(ngModel)]="rejectReason" rows="3" placeholder="Expliquez pourquoi ce budget est rejeté..."></textarea>
+                <mat-select [(ngModel)]="rejectReasonSelect">
+                  <mat-option *ngFor="let r of rejectionReasons()" [value]="r">{{r}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="rejectReasonSelect === 'Autre'">
+                <mat-label>Préciser le motif</mat-label>
+                <textarea matInput [(ngModel)]="rejectReasonOther" rows="2" placeholder="Expliquez pourquoi..."></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Commentaire (optionnel)</mat-label>
+                <textarea matInput [(ngModel)]="rejectComment" rows="2" placeholder="Informations complémentaires pour l'entité..."></textarea>
               </mat-form-field>
               <div class="reject-actions">
-                <button mat-stroked-button (click)="showReject=false;rejectReason=''">Annuler</button>
+                <button mat-stroked-button (click)="showReject=false;rejectReasonSelect='';rejectReasonOther='';rejectComment=''">Annuler</button>
                 <button mat-raised-button class="btn-reject" (click)="financeReject()" [disabled]="!rejectReason || saving()">
                   <mat-icon>send</mat-icon> Confirmer le rejet
                 </button>
@@ -188,7 +200,17 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
             <div class="reject-form" *ngIf="showReject">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Motif du rejet (obligatoire)</mat-label>
-                <textarea matInput [(ngModel)]="rejectReason" rows="3" placeholder="Expliquez pourquoi ce budget est rejeté..."></textarea>
+                <mat-select [(ngModel)]="rejectReasonSelect">
+                  <mat-option *ngFor="let r of rejectionReasons()" [value]="r">{{r}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="rejectReasonSelect === 'Autre'">
+                <mat-label>Préciser le motif</mat-label>
+                <textarea matInput [(ngModel)]="rejectReasonOther" rows="2" placeholder="Expliquez pourquoi..."></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Commentaire (optionnel)</mat-label>
+                <textarea matInput [(ngModel)]="rejectComment" rows="2" placeholder="Informations complémentaires pour l'entité..."></textarea>
               </mat-form-field>
               <div class="tdr-correction-zone">
                 <span class="tdr-corr-hint"><mat-icon>description</mat-icon> TDR corrigé (facultatif — remplace l'actuel)</span>
@@ -203,7 +225,7 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
                 </label>
               </div>
               <div class="reject-actions">
-                <button mat-stroked-button (click)="showReject=false;rejectReason='';clearPendingTdr()">Annuler</button>
+                <button mat-stroked-button (click)="showReject=false;rejectReasonSelect='';rejectReasonOther='';rejectComment='';clearPendingTdr()">Annuler</button>
                 <button mat-raised-button class="btn-reject" (click)="tpmReject()" [disabled]="!rejectReason || saving() || tdrUploading()">
                   <mat-icon>send</mat-icon> {{tdrUploading() ? 'Envoi TDR...' : 'Confirmer le rejet'}}
                 </button>
@@ -231,7 +253,17 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
             <div class="reject-form" *ngIf="showReject">
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Motif du rejet (obligatoire)</mat-label>
-                <textarea matInput [(ngModel)]="rejectReason" rows="3" placeholder="Expliquez pourquoi ce budget est rejeté..."></textarea>
+                <mat-select [(ngModel)]="rejectReasonSelect">
+                  <mat-option *ngFor="let r of rejectionReasons()" [value]="r">{{r}}</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width" *ngIf="rejectReasonSelect === 'Autre'">
+                <mat-label>Préciser le motif</mat-label>
+                <textarea matInput [(ngModel)]="rejectReasonOther" rows="2" placeholder="Expliquez pourquoi..."></textarea>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Commentaire (optionnel)</mat-label>
+                <textarea matInput [(ngModel)]="rejectComment" rows="2" placeholder="Informations complémentaires pour l'entité..."></textarea>
               </mat-form-field>
               <div class="tdr-correction-zone">
                 <span class="tdr-corr-hint"><mat-icon>description</mat-icon> TDR corrigé (facultatif — remplace l'actuel)</span>
@@ -246,7 +278,7 @@ import { BudgetRecallComponent } from '../budget-recall/budget-recall.component'
                 </label>
               </div>
               <div class="reject-actions">
-                <button mat-stroked-button (click)="showReject=false;rejectReason='';clearPendingTdr()">Annuler</button>
+                <button mat-stroked-button (click)="showReject=false;rejectReasonSelect='';rejectReasonOther='';rejectComment='';clearPendingTdr()">Annuler</button>
                 <button mat-raised-button class="btn-reject" (click)="copReject()" [disabled]="!rejectReason || saving() || tdrUploading()">
                   <mat-icon>send</mat-icon> {{tdrUploading() ? 'Envoi TDR...' : 'Confirmer le rejet'}}
                 </button>
@@ -376,7 +408,13 @@ export class BudgetReviewComponent implements OnInit {
   saving = signal(false);
   tdrUploading = signal(false);
   showReject = false;
-  rejectReason = '';
+  rejectReasonSelect = '';
+  rejectReasonOther = '';
+  rejectComment = '';
+  get rejectReason(): string {
+    return this.rejectReasonSelect === 'Autre' ? this.rejectReasonOther : this.rejectReasonSelect;
+  }
+  rejectionReasons = signal<string[]>([]);
   pendingTdrFile: File | null = null;
   rows: BudgetRow[] = [];
   lineMap: Record<string, any> = {};
@@ -441,6 +479,18 @@ export class BudgetReviewComponent implements OnInit {
 
   async ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
+    // Load configurable rejection reasons; fall back to defaults if empty
+    firstValueFrom(this.api.getConfigListByType('rejection_reasons')).then(items => {
+      const vals = items.map((i: any) => i.value);
+      if (vals.length > 0) this.rejectionReasons.set(vals);
+      else this.rejectionReasons.set([
+        'Budget incomplet', 'Montants non justifiés', 'Activités non éligibles au financement',
+        'Non-conformité aux procédures', 'Documentation insuffisante', 'Dépassement du plafond autorisé', 'Autre',
+      ]);
+    }).catch(() => this.rejectionReasons.set([
+      'Budget incomplet', 'Montants non justifiés', 'Activités non éligibles au financement',
+      'Non-conformité aux procédures', 'Documentation insuffisante', 'Dépassement du plafond autorisé', 'Autre',
+    ]));
     try {
       const b = await firstValueFrom(this.api.getBudget(id));
       this.budget.set(b);
@@ -480,7 +530,7 @@ export class BudgetReviewComponent implements OnInit {
     if (!this.rejectReason) return;
     this.saving.set(true);
     try {
-      await firstValueFrom(this.api.financeReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason }));
+      await firstValueFrom(this.api.financeReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason, rejectionComment: this.rejectComment || undefined }));
       this.snack.open('Budget rejeté par Finance', 'OK', { duration: 3000 });
       this.router.navigate(['/budgets']);
     } catch {
@@ -531,7 +581,7 @@ export class BudgetReviewComponent implements OnInit {
     this.saving.set(true);
     try {
       if (this.pendingTdrFile) await this.uploadPendingTdr();
-      await firstValueFrom(this.api.tpmReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason }));
+      await firstValueFrom(this.api.tpmReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason, rejectionComment: this.rejectComment || undefined }));
       this.snack.open('Budget rejeté' + (this.budget()?.tdrFilePath ? ' — TDR corrigé enregistré' : ''), 'OK', { duration: 3000 });
       this.router.navigate(['/budgets']);
     } catch {
@@ -560,7 +610,7 @@ export class BudgetReviewComponent implements OnInit {
     this.saving.set(true);
     try {
       if (this.pendingTdrFile) await this.uploadPendingTdr();
-      await firstValueFrom(this.api.copReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason }));
+      await firstValueFrom(this.api.copReviewBudget(this.budget()!.id, { decision: 'rejected', rejectionReason: this.rejectReason, rejectionComment: this.rejectComment || undefined }));
       this.snack.open('Budget rejeté' + (this.pendingTdrFile ? ' — TDR corrigé enregistré' : ''), 'OK', { duration: 3000 });
       this.router.navigate(['/budgets']);
     } catch {

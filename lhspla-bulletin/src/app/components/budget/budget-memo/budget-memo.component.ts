@@ -122,7 +122,7 @@ const STATUS_COLORS: Record<MemoStatus, string> = {
           <div class="file-upload-row">
             <label class="btn-upload-memo">
               <mat-icon>upload_file</mat-icon>
-              {{form.file ? form.file.name : 'Joindre un fichier (PDF/Word — optionnel)'}}
+              {{form.file ? form.file.name : 'Joindre un fichier (PDF/Word — obligatoire) *'}}
               <input type="file" accept=".pdf,.doc,.docx" (change)="onFileChange($event)" hidden>
             </label>
             <button mat-icon-button color="warn" *ngIf="form.file" (click)="form.file = null"
@@ -395,6 +395,7 @@ export class BudgetMemoComponent implements OnInit {
   isFormValid(): boolean {
     if (!this.form.category) return false;
     if (this.form.category !== 'sans_incidence' && (!this.form.amount || this.form.amount <= 0)) return false;
+    if (!this.form.file) return false;
     return true;
   }
 

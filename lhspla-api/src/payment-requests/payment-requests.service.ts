@@ -224,6 +224,9 @@ export class PaymentRequestsService {
       data: { status: 'paid', paidAt: new Date() },
     });
 
+    // Auto-clôture budget si toutes les demandes sont payées et ont des preuves
+    await this.checkAndAutoCloturer(pr.budgetId);
+
     // Notifier admin_finance et entity_member
     const financeTargets = await this.prisma.user.findMany({
       where: { roles: { has: Role.admin_finance }, isActive: true },
@@ -377,5 +380,30 @@ export class PaymentRequestsService {
 
   private fmtFcfa(n: number): string {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(n);
+  }
+
+  private async checkAndAutoCloturer(budgetId: string): Promise<void> {
+    const requests = await this.prisma.paymentRequest.findMany({
+      where: { budgetId },
+      include: { proofs: true },
+    });
+    if (requests.length === 0) return;
+
+    const allPaid      = requests.every(r => r.status === 'paid');
+    const allHaveProof = requests.every(r => r.proofs.length > 0);
+
+    if (allPaid && allHaveProof) {
+      const budget = await this.prisma.budgetProject.findUnique({ where: { id: budgetId } });
+      if (budget && budget.status !== 'cloture') {
+        await this.prisma.budgetProject.update({
+          where: { id: budgetId },
+          data: {
+            previousStatus: budget.status as any,
+            status:         'cloture' as any,
+            closedAt:       new Date(),
+          },
+        });
+      }
+    }
   }
 }

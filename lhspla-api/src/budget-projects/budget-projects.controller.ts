@@ -1,7 +1,7 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Query,
   UseGuards, Request, Res, NotFoundException,
-  UseInterceptors, UploadedFile, BadRequestException,
+  UseInterceptors, UploadedFile, BadRequestException, Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -119,5 +119,43 @@ export class BudgetProjectsController {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `inline; filename="TDR.${ext}"`);
     res.sendFile(filePath);
+  }
+
+  // ── Clôture ────────────────────────────────────────────────────────────────
+
+  @Post(':id/cloturer')
+  cloturer(@Param('id') id: string, @Request() req: any) {
+    return this.svc.cloturer(id, req.user.id, req.user.roles);
+  }
+
+  @Post(':id/declassifier')
+  declassifier(@Param('id') id: string, @Request() req: any) {
+    return this.svc.declassifier(id, req.user.id, req.user.roles);
+  }
+
+  @Post(':id/archive-zip')
+  async archiveZip(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { pdfBase64?: string },
+    @Res() res: Response,
+  ) {
+    const logger = new Logger('BudgetArchiveZip');
+    try {
+      const pdfBuffer = body?.pdfBase64
+        ? Buffer.from(body.pdfBase64, 'base64')
+        : undefined;
+      const { buffer, filename } = await this.svc.generateArchiveZip(id, req.user.roles, pdfBuffer);
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (err: any) {
+      logger.error(`Archive ZIP erreur budget ${id} : ${err?.message}`, err?.stack);
+      const status  = err?.status ?? err?.statusCode ?? 500;
+      const message = err?.message ?? 'Erreur lors de la génération de l\'archive';
+      if (!res.headersSent) {
+        res.status(status).json({ statusCode: status, message });
+      }
+    }
   }
 }

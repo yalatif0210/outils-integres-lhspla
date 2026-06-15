@@ -1,0 +1,45 @@
+# ── Stage 1: Build NestJS ────────────────────────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY lhspla-api/package*.json ./
+RUN npm ci --include=dev
+
+COPY lhspla-api/ .
+RUN npx prisma generate
+RUN npm run build
+
+# ── Stage 2: Production ──────────────────────────────────────────────────────
+FROM node:20-slim AS production
+
+# Python 3 + matplotlib pour generate_timeline_chart.py
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      python3 \
+      python3-matplotlib \
+      python3-numpy \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/dist            ./dist
+COPY --from=builder /app/node_modules    ./node_modules
+COPY --from=builder /app/package*.json   ./
+COPY --from=builder /app/prisma          ./prisma
+
+# Scripts Python (timeline chart)
+COPY lhspla-api/scripts/ ./scripts/
+
+# Répertoires uploads créés à l'avance (montés en volume en prod)
+RUN mkdir -p uploads/briefs uploads/missions uploads/tdr \
+             uploads/budget-memos uploads/payment-proofs \
+             uploads/payment-requests uploads/payment-template \
+             uploads/recalls
+
+# Script de démarrage : migrate puis start
+COPY docker/api/entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+EXPOSE 3000
+ENTRYPOINT ["./entrypoint.sh"]

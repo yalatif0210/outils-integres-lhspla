@@ -151,16 +151,30 @@ export class ApiService {
   createBudget(data: any) { return this.http.post<any>(`${this.base}/budget-projects`, data); }
   updateBudget(id: string, data: any) { return this.http.patch<any>(`${this.base}/budget-projects/${id}`, data); }
   submitBudget(id: string) { return this.http.post<any>(`${this.base}/budget-projects/${id}/submit`, {}); }
-  financeReviewBudget(id: string, data: { decision: 'finance_reviewed' | 'rejected'; rejectionReason?: string }) {
+  financeReviewBudget(id: string, data: { decision: 'finance_reviewed' | 'rejected'; rejectionReason?: string; rejectionComment?: string }) {
     return this.http.post<any>(`${this.base}/budget-projects/${id}/finance-review`, data);
   }
-  tpmReviewBudget(id: string, data: { decision: 'tpm_approved' | 'rejected'; rejectionReason?: string }) {
+  tpmReviewBudget(id: string, data: { decision: 'tpm_approved' | 'rejected'; rejectionReason?: string; rejectionComment?: string }) {
     return this.http.post<any>(`${this.base}/budget-projects/${id}/tpm-review`, data);
   }
-  copReviewBudget(id: string, data: { decision: 'approved' | 'rejected'; rejectionReason?: string }) {
+  copReviewBudget(id: string, data: { decision: 'approved' | 'rejected'; rejectionReason?: string; rejectionComment?: string }) {
     return this.http.post<any>(`${this.base}/budget-projects/${id}/cop-review`, data);
   }
   deleteBudget(id: string) { return this.http.delete<any>(`${this.base}/budget-projects/${id}`); }
+  cloturerBudget(id: string) { return this.http.post<any>(`${this.base}/budget-projects/${id}/cloturer`, {}); }
+  declassifierBudget(id: string) { return this.http.post<any>(`${this.base}/budget-projects/${id}/declassifier`, {}); }
+  downloadBudgetArchiveZip(id: string, pdfBase64?: string) {
+    return this.http.post(`${this.base}/budget-projects/${id}/archive-zip`,
+      { pdfBase64 }, { responseType: 'blob' });
+  }
+
+  // ─── Listes configurables ─────────────────────────────────────────────────
+  getConfigListByType(type: string) { return this.http.get<any[]>(`${this.base}/config-lists/by-type/${type}`); }
+  getConfigLists(type?: string) { return this.http.get<any[]>(`${this.base}/config-lists${type ? `?type=${type}` : ''}`); }
+  createConfigListItem(data: { type: string; value: string; order?: number }) { return this.http.post<any>(`${this.base}/config-lists`, data); }
+  updateConfigListItem(id: string, data: { value?: string; order?: number; isActive?: boolean }) { return this.http.patch<any>(`${this.base}/config-lists/${id}`, data); }
+  deleteConfigListItem(id: string) { return this.http.delete<any>(`${this.base}/config-lists/${id}`); }
+  seedConfigList(type: string, values: string[]) { return this.http.post<any>(`${this.base}/config-lists/seed`, { type, values }); }
 
   // ─── Grille de coûts ──────────────────────────────────────────────────────
   getCostItems(all = false) { return this.http.get<any[]>(`${this.base}/cost-items${all ? '?all=true' : ''}`); }
@@ -329,5 +343,64 @@ export class ApiService {
   }
   copReviewBudgetMemo(id: string, data: { decision: 'approved' | 'rejected'; rejectionReason?: string }) {
     return this.http.post<any>(`${this.base}/budget-memos/${id}/cop-review`, data);
+  }
+
+  // ─── Stock hebdomadaire ───────────────────────────────────────────────────
+  getStockEntries(semaine?: string, programme?: string, statut?: string) {
+    let params = new HttpParams();
+    if (semaine) params = params.set('semaine', semaine);
+    if (programme) params = params.set('programme', programme);
+    if (statut) params = params.set('statut', statut);
+    return this.http.get<any[]>(`${this.base}/stock`, { params });
+  }
+  createStockEntry(data: any) { return this.http.post<any>(`${this.base}/stock`, data); }
+  updateStockEntry(id: string, data: any) { return this.http.put<any>(`${this.base}/stock/${id}`, data); }
+  deleteStockEntry(id: string) { return this.http.delete<any>(`${this.base}/stock/${id}`); }
+  getStockAnnexeA(semaine: string, critiques = false) {
+    return this.http.get<any>(`${this.base}/stock/annexe-a?semaine=${semaine}&critiques=${critiques}`);
+  }
+  downloadStockTemplate() {
+    return this.http.get(`${this.base}/stock/template/download`, { responseType: 'blob' });
+  }
+  importStockExcel(formData: FormData) {
+    return this.http.post<any>(`${this.base}/stock/import`, formData);
+  }
+  importStockPptx(formData: FormData) {
+    return this.http.post<any>(`${this.base}/stock/import-pptx`, formData);
+  }
+  getRefDenominations(programme?: string) {
+    const params = programme ? `?programme=${programme}` : '';
+    return this.http.get<any[]>(`${this.base}/stock/denominations${params}`);
+  }
+  createRefDenomination(data: any) { return this.http.post<any>(`${this.base}/stock/denominations`, data); }
+  updateRefDenomination(id: string, data: any) { return this.http.put<any>(`${this.base}/stock/denominations/${id}`, data); }
+
+  // ─── Weekly Operations Brief ──────────────────────────────────────────────
+  getBriefPreview(semaineId: string) {
+    return this.http.get<any>(`${this.base}/brief/preview?semaine_id=${semaineId}`);
+  }
+  generateBriefPdf(semaineId: string, force = false) {
+    return this.http.get(`${this.base}/brief/generate?semaine_id=${semaineId}&force=${force}&format=pdf`, { responseType: 'blob' });
+  }
+  generateBriefDocx(semaineId: string) {
+    return this.http.get(`${this.base}/brief/generate?semaine_id=${semaineId}&format=docx`, { responseType: 'blob' });
+  }
+  generateBriefSections(semaineId: string) {
+    return this.http.post<any>(`${this.base}/brief/generate-sections?semaine_id=${semaineId}`, {});
+  }
+  getBriefDraft(semaineId: string) {
+    return this.http.get<any>(`${this.base}/brief/draft?semaine_id=${semaineId}`);
+  }
+  updateBriefDraft(id: string, body: any) {
+    return this.http.patch<any>(`${this.base}/brief/draft/${id}`, body);
+  }
+  getBriefHistory() { return this.http.get<any[]>(`${this.base}/brief/history`); }
+  downloadBriefHistoryFile(id: string) {
+    return this.http.get(`${this.base}/brief/history/${id}/download`, { responseType: 'blob' });
+  }
+
+  // ─── Compilation ──────────────────────────────────────────────────────────
+  exportBulletinExcel(semaine: string) {
+    return this.http.get(`${this.base}/compilation/export-excel?semaine=${semaine}`, { responseType: 'blob' });
   }
 }

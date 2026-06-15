@@ -1,0 +1,50 @@
+## SOURCE
+Extrait du fichier : modele_brief_25mai2026.docx
+Semaine de référence : 25-29 mai 2026
+Utilisé comme exemple few-shot dans brief-llm.service.ts (SYSTEM_PROMPT)
+
+## SECTION B — ACTIVITÉS RÉALISÉES
+
+CAD — Chaîne d'Approvisionnement Décentralisée
+Orientation logistique départementale & Formation
+Rencontre d'orientation logistique au DS APA (26 mai) — 14 acteurs des ESPC sensibilisés sur le respect des délais RM, qualité des données rapportées, Système d'Alerte Précoce et gestion des produits iCCM. Suivi exécution plans de redéploiement (semaine précédente, 5 régions) : taux 100% pour Worodougou, Bélier et Haut-Sassandra ; 80% pour Lôh-Djiboua, Gôh et Agnéby-Tiassa. 1 nouveau plan élaboré en cours de réalisation. Suivi complétude mSupply — relances dans les groupes WhatsApp districts zones Bouaké. Formation de 15 acteurs (ESPC et districts) à Yamoussoukro (27-31 mai) — optimisation gestion des stocks, entreposage, prise en main mSupply, SAP et assistance technique ; progression significative aux pré/post-tests.
+
+CAC — Chaîne d'Approvisionnement Communautaire
+Supervision iCCM & Inventaire Agence Programme
+Mission de suivi des recommandations EUV et coaching ASC/ASS — DS Tiassalé (28-29 mai) : 2 ESPC visités, coaching registre ASC et Weekly Report Communautaire ; coaching au rapportage et remplissage e-SIGL.
+
+QAD — Quantification, Achat & Distribution
+Suivi stocks, approvisionnement et orientation charge virale
+Réunion de suivi mensuel des stocks PNS (26 mai, en ligne) — recommandations NPSP : fournir date livraison reliquat ARV 1L BGE ; retirer amikacine injectable d'eSIGL ; retarder commande Bedaquiline 20 mg (surstock central et périphérique — report fin septembre 2026). Transmission des observations sur le document d'exonération des acquisitions planifiées sur budget du Gouvernement américain. Renforcement des capacités de 18 agents (pharmacie et laboratoire) sur la gestion des produits mPima et consommables labo généraux (28 mai, Abidjan). Finalisation de la correspondance désignations/codes QAT–Sage X3 pour le fichier de suivi intégré de réception des produits. Démarrage de l'inventaire tournant des produits traceurs — Agence Abidjan (30 mai-03 juin). Inventaire physique tournant — Agence Programme (16-20 mai) : réalisé ; finalisation de la justification des écarts et rédaction du rapport en cours.
+
+## SECTION C — ACTIVITÉS PLANIFIÉES
+
+ACTIVITÉS AVEC PARTICIPATION DoS
+QAD — Atelier de pré-quantification médicaments PNSME — Bassam, 01-04 juin 2026
+QAD — Atelier de quantification médicaments PNSME — Yamoussoukro, 15-20 juin 2026
+
+CAD — Chaîne d'Approvisionnement Décentralisée
+Réunions régionales d'analyse et mise à niveau des stocks — Gbôklê, N'Zi, Grands Ponts (08-12 juin) ; orientations logistiques DS Divo, Dabou, Doropo, Alépé (01-12 juin). Orientations logistiques départementales — 20 DS zone Bouaké, 08-19 juin. Formation 30 acteurs (APGP, IDE, SFDE) — Yamoussoukro, 01-06 juin ; visites AT Abidjan 2 (01-05 juin) ; orientation pharmaciens management CA — Yamoussoukro, 08-12 juin. Visites de sites à faibles résultats — zone Bouaké, 15-25 juin.
+
+PMO — Gestion de Projet
+Compilation et transmission ORCHESTRA — Abidjan, 04-05 juin. Réunion mensuelle bilan de performance juin 2026 — Abidjan, 09 juin.
+
+QAD — Quantification, Achat & Distribution
+4 sessions d'orientation acteurs gestion logistique charge virale/EID — Abidjan, 01-04 juin. Supervision laboratoires CV — Korhogo/Bouaké/Daloa (07-13 juin) et Abengourou (17-19 juin). Suivi hebdomadaire entrées machine, réapprovisionnements, écarts inventaires — Abidjan, 25-31 mai. Réunion quinzomadaire Agence Programme (25 mai-07 juin).
+
+SE — Suivi & Évaluation (MEL)
+Appui mise en œuvre recommandations EUV 2025 — 10 DS, 27 mai-10 juin. Déploiement SNGFA File Active — 6 régions, 07-18 juin ; puis 6 régions supplémentaires, 21 juin-03 juillet.
+
+SI — Système d'Information
+Data Quality Assessment — 10 DS cibles, 08-12 juin ; monitoring distant DQA, 15-27 juin. Cartographie et priorisation des bugs mSupply (01-30 juin) ; développement guides utilisateurs simplifiés ; acquisition 37 ordinateurs (14 en cours, 23 restants).
+
+## SECTION D — POINTS DE VIGILANCE
+
+MODÉRÉ — Restructuration du prestataire du logiciel ORCHESTRA nécessitant une révision du contrat — aucune avancée sur le paiement de la maintenance, risque de bugs lors d'utilisation.
+→ Action requise : Approche du Département Juridique pour une accélération du traitement du dossier.
+
+ÉLEVÉ — Faible disponibilité de plusieurs consommables de laboratoire sur budget ÉTAT au niveau central (DBS, Tubes EDTA, Tubes rouge/gris, Pastilles de chloramine).
+→ Action requise : Procéder à des acquisitions de dépannage pour garantir la continuité des services ; procéder au paiement des fournisseurs pour la livraison des kits DBS.
+
+ÉLEVÉ — Refus de libération des colis arrivés en douane — exonération des produits financés par le Gouvernement américain expirée. La douane réclame un document officiel attestant la poursuite des activités LHSPLA sous couvert du Département d'État américain.
+→ Action requise : Obtenir un délai additionnel auprès de la DGD pour la libération des colis ; fournir une note officielle DoS à la douane.

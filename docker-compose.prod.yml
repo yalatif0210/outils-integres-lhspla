@@ -1,0 +1,69 @@
+services:
+
+  # ── Base de données production ────────────────────────────────────────────────
+  prod-db:
+    image: postgres:16-alpine
+    container_name: prod-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       lhspla_prod
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD}
+    volumes:
+      - prod-db-data:/var/lib/postgresql/data
+    networks:
+      - lhspla-prod-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lhspla_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API NestJS production ─────────────────────────────────────────────────────
+  prod-api:
+    image: ghcr.io/${GITHUB_REPOSITORY}/lhspla-api:prod
+    container_name: prod-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:           postgresql://postgres:${PROD_DB_PASSWORD}@prod-db:5432/lhspla_prod?schema=public
+      JWT_SECRET:             ${PROD_JWT_SECRET}
+      JWT_EXPIRES_IN:         15m
+      JWT_REFRESH_SECRET:     ${PROD_JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT:                   3000
+      FRONTEND_URL:           https://vps.lhspla-ci.org
+      N8N_WEBHOOK_BASE_URL:   http://n8n:5678/webhook
+      ANTHROPIC_API_KEY:      ${ANTHROPIC_API_KEY:-}
+      MISTRAL_API_KEY:        ${MISTRAL_API_KEY:-}
+      MAIL_HOST:              ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT:              ${MAIL_PORT:-587}
+      MAIL_USER:              ${MAIL_USER:-}
+      MAIL_PASS:              ${MAIL_PASS:-}
+      MAIL_FROM:              ${MAIL_FROM:-LHSPLA <noreply@lhspla.ci>}
+    volumes:
+      - uploads-prod:/app/uploads
+    depends_on:
+      prod-db:
+        condition: service_healthy
+    networks:
+      - lhspla-prod-net
+
+  # ── Frontend Angular production ───────────────────────────────────────────────
+  prod-frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/lhspla-frontend:prod
+    container_name: prod-frontend
+    restart: unless-stopped
+    environment:
+      API_HOST: prod-api
+    depends_on:
+      - prod-api
+    networks:
+      - lhspla-prod-net
+
+networks:
+  lhspla-prod-net:
+    name: lhspla-prod-net
+
+volumes:
+  prod-db-data:
+  uploads-prod:

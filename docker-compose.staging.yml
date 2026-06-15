@@ -1,0 +1,71 @@
+services:
+
+  # ── Base de données staging ───────────────────────────────────────────────────
+  stg-db:
+    image: postgres:16-alpine
+    container_name: stg-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       lhspla_staging
+      POSTGRES_USER:     postgres
+      POSTGRES_PASSWORD: ${STG_DB_PASSWORD}
+    volumes:
+      - stg-db-data:/var/lib/postgresql/data
+    networks:
+      - lhspla-stg-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lhspla_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API NestJS staging ────────────────────────────────────────────────────────
+  stg-api:
+    image: ghcr.io/${GITHUB_REPOSITORY}/lhspla-api:staging
+    container_name: stg-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL:          postgresql://postgres:${STG_DB_PASSWORD}@stg-db:5432/lhspla_staging?schema=public
+      JWT_SECRET:            ${STG_JWT_SECRET}
+      JWT_EXPIRES_IN:        15m
+      JWT_REFRESH_SECRET:    ${STG_JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: 7d
+      PORT:                  3000
+      FRONTEND_URL:          http://vps.lhspla-ci.org:8080
+      N8N_WEBHOOK_BASE_URL:  http://n8n:5678/webhook
+      ANTHROPIC_API_KEY:     ${ANTHROPIC_API_KEY:-}
+      MISTRAL_API_KEY:       ${MISTRAL_API_KEY:-}
+      MAIL_HOST:             ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT:             ${MAIL_PORT:-587}
+      MAIL_USER:             ${MAIL_USER:-}
+      MAIL_PASS:             ${MAIL_PASS:-}
+      MAIL_FROM:             ${MAIL_FROM:-LHSPLA Staging <noreply@lhspla.ci>}
+    volumes:
+      - uploads-stg:/app/uploads
+    depends_on:
+      stg-db:
+        condition: service_healthy
+    networks:
+      - lhspla-stg-net
+
+  # ── Frontend Angular staging — port 8080 ─────────────────────────────────────
+  stg-frontend:
+    image: ghcr.io/${GITHUB_REPOSITORY}/lhspla-frontend:staging
+    container_name: stg-frontend
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      API_HOST: stg-api
+    depends_on:
+      - stg-api
+    networks:
+      - lhspla-stg-net
+
+networks:
+  lhspla-stg-net:
+    name: lhspla-stg-net
+
+volumes:
+  stg-db-data:
+  uploads-stg:

@@ -62,6 +62,7 @@ enum BudgetStatus {
   rejected
   archived
   mission_cop
+  cloture
 }
 
 enum MissionStatus {
@@ -111,6 +112,32 @@ enum CriticalityLevel {
   faible
 }
 
+enum Programme {
+  PNLS
+  PNLP
+  PNSME
+}
+
+enum StockStatus {
+  RUPTURE_PAYS
+  RUPTURE_CENTRALE
+  RUPTURE_IMMINENTE
+  RISQUE
+  BON_STOCKAGE
+  SURSTOCK
+  RISQUE_PEREMPTION
+}
+
+enum SourceReapprovisionnement {
+  GOVCI
+  FM
+  PEPFAR
+  UNFPA
+  USG
+  MOU_USG
+  AUTRE
+}
+
 enum DosParticipation {
   oui
   non
@@ -144,6 +171,7 @@ model User {
   financeReviewedBudgets  BudgetProject[]  @relation("BudgetFinanceReviewer")
   tpmReviewedBudgets      BudgetProject[]  @relation("BudgetTPMReviewer")
   reviewedBudgets         BudgetProject[]  @relation("BudgetCOPReviewer")
+  closedBudgets           BudgetProject[]  @relation("BudgetClosedBy")
   closedRecalls           BudgetRecall[]   @relation("RecallClosedBy")
   recallAuditLogs         RecallAuditLog[]
   initiatedMissions       MissionRequest[] @relation("MissionInitiator")
@@ -155,6 +183,10 @@ model User {
   budgetMemos             BudgetMemo[]     @relation("MemoCreatedBy")
   reviewedMemos           BudgetMemo[]     @relation("MemoReviewedBy")
   tdrHistoryUploads       BudgetTdrHistory[] @relation("TdrHistoryUploadedBy")
+  stockEntries            StockEntry[]       @relation("StockSaisieBy")
+  importLogs              ImportLog[]        @relation("ImportLogBy")
+  briefHistories          BriefHistory[]     @relation("BriefGenBy")
+  briefDrafts             BriefDraft[]       @relation("BriefDraftBy")
 
   @@index([entityCode])
 }
@@ -171,6 +203,7 @@ model Week {
 
   creator     User               @relation("WeekCreatedBy", fields: [createdBy], references: [id])
   submissions EntitySubmission[]
+  briefDrafts BriefDraft[]
 
   @@index([status])
   @@index([weekStart])
@@ -337,17 +370,22 @@ model BudgetProject {
   tpmReviewedById     String?
   reviewedAt          DateTime?
   reviewedById        String?
-  tdrFilePath         String?
-  tdrFileExt          String?
-  budgetNumber        String?       @unique
-  financeReviewedAt   DateTime?
-  financeReviewedById String?
+  tdrFilePath             String?
+  tdrFileExt              String?
+  budgetNumber            String?       @unique
+  financeReviewedAt       DateTime?
+  financeReviewedById     String?
+  probableExecutionDate   DateTime?
+  closedAt                DateTime?
+  closedById              String?
+  previousStatus          BudgetStatus?
 
   fund              FinancingFund      @relation(fields: [fundId], references: [id])
   activityReference ActivityReference? @relation(fields: [activityReferenceId], references: [id])
   financeReviewedBy User?              @relation("BudgetFinanceReviewer", fields: [financeReviewedById], references: [id])
   tpmReviewedBy     User?              @relation("BudgetTPMReviewer", fields: [tpmReviewedById], references: [id])
   reviewedBy        User?              @relation("BudgetCOPReviewer", fields: [reviewedById], references: [id])
+  closedBy          User?              @relation("BudgetClosedBy", fields: [closedById], references: [id])
   lines             BudgetLine[]
   recalls           BudgetRecall[]
   missions          MissionRequest[]
@@ -508,6 +546,8 @@ model MissionRequest {
   activityRefId   String?
   object          String
   location        String
+  transportMode   String?
+  manualBudgetRef String?
   departureDate   DateTime
   returnDate      DateTime
   resumeDate      DateTime
@@ -640,6 +680,118 @@ model BudgetTdrHistory {
   uploadedBy User          @relation("TdrHistoryUploadedBy", fields: [uploadedById], references: [id])
 
   @@index([budgetId])
+}
+
+model ConfigList {
+  id        String   @id @default(uuid())
+  type      String
+  value     String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([type])
+}
+
+// ─── Module Stock Hebdomadaire ───────────────────────────────────────────────
+
+model RefDenomination {
+  id            String    @id @default(uuid())
+  programme     Programme
+  sousCategorie String
+  denomination  String
+  isActive      Boolean   @default(true)
+  order         Int       @default(0)
+  version       Int       @default(1)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  stockEntries StockEntry[]
+
+  @@unique([denomination, programme])
+  @@index([programme, sousCategorie])
+}
+
+model StockEntry {
+  id                        String                    @id @default(uuid())
+  semaine                   DateTime
+  dateEtatStock             DateTime?
+  programme                 Programme
+  sousCategorie             String
+  denomination              String
+  denominationId            String?
+  stockCentrale             BigInt?
+  stockCentralMsd           Decimal?                  @db.Decimal(6, 2)
+  stockNational             BigInt?
+  cmm                       Decimal?                  @db.Decimal(10, 2)
+  datePeremptionCentrale    String?
+  datePeremptionPeripherie  String?
+  statutStock               StockStatus
+  statutOverride            Boolean                   @default(false)
+  stockPeripherique         BigInt                    @default(0)
+  sourceReapprovisionnement SourceReapprovisionnement?
+  quantiteAttendue          BigInt                    @default(0)
+  dateLivraisonPrevue       DateTime?
+  commentaire               String                    @default("")
+  saisiePar                 String
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+
+  denominationRef RefDenomination? @relation(fields: [denominationId], references: [id])
+  saisieUser      User             @relation("StockSaisieBy", fields: [saisiePar], references: [id])
+
+  @@unique([semaine, denomination, programme])
+  @@index([semaine, programme])
+  @@index([statutStock])
+}
+
+model ImportLog {
+  id           String   @id @default(uuid())
+  userId       String
+  semaine      DateTime
+  nbImported   Int      @default(0)
+  nbErrors     Int      @default(0)
+  nbDuplicates Int      @default(0)
+  report       Json?
+  importedAt   DateTime @default(now())
+
+  user User @relation("ImportLogBy", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([semaine])
+}
+
+// ─── Module Weekly Operations Brief ──────────────────────────────────────────
+
+model BriefHistory {
+  id                 String   @id @default(uuid())
+  semaineRapportage  DateTime
+  dateGeneration     DateTime @default(now())
+  generePar          String
+  hashContenu        String
+  cheminFichier      String
+  archived           Boolean  @default(false)
+
+  genereParUser User @relation("BriefGenBy", fields: [generePar], references: [id])
+
+  @@index([semaineRapportage])
+}
+
+model BriefDraft {
+  id          String   @id @default(uuid())
+  semaineId   String
+  sectionB    String   @db.Text
+  sectionC    String   @db.Text
+  sectionD    String   @db.Text
+  llmModel    String   // ex: "claude-sonnet-4-6" | "mistral-large-latest"
+  generatedAt DateTime @default(now())
+  generatedBy String
+  validated   Boolean  @default(false)
+
+  semaine         Week @relation(fields: [semaineId], references: [id])
+  generatedByUser User @relation("BriefDraftBy", fields: [generatedBy], references: [id])
+
+  @@index([semaineId])
 }
 
 model PaymentAuditLog {
