@@ -6,6 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  APP_DIR: /home/markov/lhspla
   API_IMAGE: ghcr.io/${{ github.repository_owner }}/lhspla-api
   FRONTEND_IMAGE: ghcr.io/${{ github.repository_owner }}/lhspla-frontend
 
@@ -64,17 +65,39 @@ jobs:
     environment: staging
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Écrire .env.staging sur le VPS depuis les secrets GitHub
+      - name: Préparer VPS — cloner repo si absent, sinon pull
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cat > /home/markov/.env.staging << 'EOF'
+            set -e
+            APP_DIR="/home/markov/lhspla"
+
+            # Créer réseaux Docker si absents
+            docker network create lhspla-prod-net 2>/dev/null || true
+            docker network create lhspla-stg-net  2>/dev/null || true
+
+            # Clone ou pull
+            if [ -d "$APP_DIR/.git" ]; then
+              echo "▶ Repo existant — pull develop..."
+              git -C "$APP_DIR" fetch origin
+              git -C "$APP_DIR" checkout develop
+              git -C "$APP_DIR" pull origin develop
+            else
+              echo "▶ Clone initial du repo..."
+              git clone -b develop https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git "$APP_DIR"
+            fi
+
+      - name: Écrire .env.staging depuis les secrets GitHub
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > /home/markov/lhspla/.env.staging << 'EOF'
             GITHUB_REPOSITORY=${{ github.repository }}
             STG_DB_PASSWORD=${{ secrets.STG_DB_PASSWORD }}
             STG_JWT_SECRET=${{ secrets.STG_JWT_SECRET }}
@@ -87,9 +110,9 @@ jobs:
             MAIL_PASS=
             MAIL_FROM=LHSPLA Staging <noreply@lhspla.ci>
             EOF
-            chmod 600 /home/markov/.env.staging
+            chmod 600 /home/markov/lhspla/.env.staging
 
-      - name: Deploy via SSH
+      - name: Docker pull & up staging
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.SERVER_HOST }}
@@ -97,14 +120,16 @@ jobs:
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /home/markov
+            cd /home/markov/lhspla
 
-            # Pull images et démarrage
+            # Login ghcr.io sur le VPS
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
             docker compose -f docker-compose.staging.yml --env-file .env.staging pull
             docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --remove-orphans
 
             # Seed idempotent
-            sleep 8
+            sleep 10
             docker exec stg-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
 
       - name: Health check staging (port 8080)
@@ -115,7 +140,7 @@ jobs:
           echo "Staging health: HTTP $STATUS"
           [ "$STATUS" = "200" ] || exit 1
 
-  # ── Promote develop → main (déclenche pipeline prod) ────────────────────────
+  # ── Promote develop → main ──────────────────────────────────────────────────
   promote:
     name: Merge develop → main
     runs-on: ubuntu-latest
@@ -138,4 +163,4 @@ jobs:
           git fetch origin develop
           git merge origin/develop --no-ff -m "chore: auto-merge develop → main après staging ✅"
           git push origin main
-          echo "✅ main aligné sur develop — pipeline prod déclenché automatiquement"
+          echo "✅ main aligné sur develop — pipeline prod déclenché"

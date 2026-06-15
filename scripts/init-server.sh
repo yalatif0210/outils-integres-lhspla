@@ -8,7 +8,7 @@ set -e
 
 DOMAIN="vps.lhspla-ci.org"
 EMAIL="admin@lhspla.ci"
-APP_DIR="/home/markov"
+APP_DIR="/home/markov/lhspla"
 
 echo "══════════════════════════════════════════════"
 echo "  LHSPLA — Initialisation serveur"

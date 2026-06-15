@@ -2,7 +2,7 @@
 # deploy-prod.sh — Déploiement production (appelé par GitHub Actions)
 set -e
 
-APP_DIR="/home/markov"
+APP_DIR="/home/markov/lhspla"
 cd "$APP_DIR"
 
 echo "▶ [Prod] Vérification staging sain avant déploiement..."

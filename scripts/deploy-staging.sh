@@ -2,7 +2,7 @@
 # deploy-staging.sh — Déploiement staging (appelé par GitHub Actions)
 set -e
 
-APP_DIR="/home/markov"
+APP_DIR="/home/markov/lhspla"
 cd "$APP_DIR"
 
 echo "▶ [Staging] Pull des nouvelles images..."

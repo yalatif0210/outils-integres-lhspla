@@ -86,14 +86,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Écrire .env.prod sur le VPS depuis les secrets GitHub
+      - name: Préparer VPS — cloner repo si absent, sinon pull
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cat > /home/markov/.env.prod << 'EOF'
+            set -e
+            APP_DIR="/home/markov/lhspla"
+            if [ -d "$APP_DIR/.git" ]; then
+              git -C "$APP_DIR" fetch origin
+              git -C "$APP_DIR" checkout main
+              git -C "$APP_DIR" pull origin main
+            else
+              git clone -b main https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git "$APP_DIR"
+            fi
+
+      - name: Écrire .env.prod depuis les secrets GitHub
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key:      ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > /home/markov/lhspla/.env.prod << 'EOF'
             GITHUB_REPOSITORY=${{ github.repository }}
             PROD_DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
             PROD_JWT_SECRET=${{ secrets.PROD_JWT_SECRET }}
@@ -110,9 +127,9 @@ jobs:
             MAIL_PASS=
             MAIL_FROM=LHSPLA <noreply@lhspla.ci>
             EOF
-            chmod 600 /home/markov/.env.prod
+            chmod 600 /home/markov/lhspla/.env.prod
 
-      - name: Deploy via SSH
+      - name: Docker pull & up production
         uses: appleboy/ssh-action@v1.0.3
         with:
           host:     ${{ secrets.SERVER_HOST }}
@@ -120,13 +137,13 @@ jobs:
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /home/markov
+            cd /home/markov/lhspla
 
-            # Pull images et démarrage
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
 
-            # Seed idempotent
             sleep 10
             docker exec prod-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
 
@@ -147,5 +164,5 @@ jobs:
           key:      ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             echo "❌ Déploiement échoué — rollback..."
-            cd /home/markov
+            cd /home/markov/lhspla
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d || true
