@@ -131,7 +131,7 @@ jobs:
 
             # Seed idempotent
             sleep 10
-            docker exec stg-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
+            docker exec stg-api sh -c "npx ts-node -O '{\"module\":\"CommonJS\"}' prisma/seed.ts" 2>/dev/null || true
 
       - name: Health check staging (nginx → api)
         uses: appleboy/ssh-action@v1.0.3

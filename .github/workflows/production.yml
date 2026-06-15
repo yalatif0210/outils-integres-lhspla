@@ -146,7 +146,7 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
 
             sleep 10
-            docker exec prod-api sh -c "npx ts-node prisma/seed.ts" 2>/dev/null || true
+            docker exec prod-api sh -c "npx ts-node -O '{\"module\":\"CommonJS\"}' prisma/seed.ts" 2>/dev/null || true
 
       - name: Health check production (nginx → api)
         uses: appleboy/ssh-action@v1.0.3

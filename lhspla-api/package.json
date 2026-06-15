@@ -19,11 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:migrate": "prisma migrate dev",
-    "db:seed": "ts-node prisma/seed.ts",
+    "db:seed": "ts-node -O '{\"module\":\"CommonJS\"}' prisma/seed.ts",
     "db:studio": "prisma studio"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node -O '{\"module\":\"CommonJS\"}' prisma/seed.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
