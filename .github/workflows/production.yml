@@ -187,4 +187,4 @@ jobs:
           script: |
             echo "❌ Déploiement échoué — rollback..."
             cd /home/markov/lhspla
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d || true
+            docker compose -p lhspla-prod -f docker-compose.prod.yml --env-file .env.prod up -d || true
