@@ -490,7 +490,7 @@ export class StockService {
       }
 
       const stdout = await new Promise<string>((resolve, reject) => {
-        const proc = spawn('python', [scriptPath, tmpFile], { windowsHide: true });
+        const proc = spawn('python3', [scriptPath, tmpFile], { windowsHide: true });
         let out = '';
         let err = '';
         proc.stdout.on('data', (d: Buffer) => { out += d.toString('utf8'); });

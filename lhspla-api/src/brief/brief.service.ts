@@ -664,7 +664,7 @@ export class BriefService {
     fs.writeFileSync(jsonPath, JSON.stringify(payload, null, 2), 'utf-8');
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn('python', [scriptPath, jsonPath, '--out', pngPath], {
+      const proc = spawn('python3', [scriptPath, jsonPath, '--out', pngPath], {
         windowsHide: true,
       });
       let stderr = '';
