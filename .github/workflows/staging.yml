@@ -127,7 +127,7 @@ jobs:
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             docker compose -f docker-compose.staging.yml --env-file .env.staging pull
-            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --remove-orphans
+            docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --remove-orphans --force-recreate
 
       - name: Seed base de données staging
         uses: appleboy/ssh-action@v1.0.3
