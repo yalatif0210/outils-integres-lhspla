@@ -73,9 +73,16 @@ Réponds UNIQUEMENT avec un objet JSON valide :
   "sectionD": "<texte section D>"
 }
 
+## RÈGLE ABSOLUE
+Tu dois analyser EXCLUSIVEMENT les données réelles soumises dans le message utilisateur.
+Ne reproduis JAMAIS les noms, dates, lieux, activités ou risques de l'exemple de référence ci-dessous dans ta réponse.
+L'exemple illustre uniquement le FORMAT et le STYLE attendus — pas le contenu.
+Si une composante n'a pas d'activités, ne la mentionne pas.
+Si la Section D ne contient aucun point de vigilance, indique simplement : "Aucun point de vigilance signalé cette semaine."
+
 ---
 
-## Exemple de sortie attendue (semaine 25-29 mai 2026)
+## Exemple de référence — FORMAT ET STYLE UNIQUEMENT (semaine 25-29 mai 2026)
 
 {
   "sectionB": "CAD — Chaîne d'Approvisionnement Décentralisée\\nOrientation logistique départementale & Formation\\nRencontre d'orientation logistique au DS APA (26 mai) — 14 acteurs des ESPC sensibilisés sur le respect des délais RM, qualité des données rapportées, Système d'Alerte Précoce et gestion des produits iCCM. Suivi exécution plans de redéploiement (semaine précédente, 5 régions) : taux 100% pour Worodougou, Bélier et Haut-Sassandra ; 80% pour Lôh-Djiboua, Gôh et Agnéby-Tiassa. 1 nouveau plan élaboré en cours de réalisation. Suivi complétude mSupply — relances dans les groupes WhatsApp districts zones Bouaké. Formation de 15 acteurs (ESPC et districts) à Yamoussoukro (27-31 mai) — optimisation gestion des stocks, entreposage, prise en main mSupply, SAP et assistance technique ; progression significative aux pré/post-tests.\\n\\nCAC — Chaîne d'Approvisionnement Communautaire\\nSupervision iCCM & Inventaire Agence Programme\\nMission de suivi des recommandations EUV et coaching ASC/ASS — DS Tiassalé (28-29 mai) : 2 ESPC visités, coaching registre ASC et Weekly Report Communautaire ; coaching au rapportage et remplissage e-SIGL.\\n\\nQAD — Quantification, Achat & Distribution\\nSuivi stocks, approvisionnement et orientation charge virale\\nRéunion de suivi mensuel des stocks PNS (26 mai, en ligne) — recommandations NPSP : fournir date livraison reliquat ARV 1L BGE ; retirer amikacine injectable d'eSIGL ; retarder commande Bedaquiline 20 mg (surstock central et périphérique — report fin septembre 2026). Transmission des observations sur le document d'exonération des acquisitions planifiées sur budget du Gouvernement américain. Renforcement des capacités de 18 agents (pharmacie et laboratoire) sur la gestion des produits mPima et consommables labo généraux (28 mai, Abidjan). Finalisation de la correspondance désignations/codes QAT–Sage X3 pour le fichier de suivi intégré de réception des produits. Démarrage de l'inventaire tournant des produits traceurs — Agence Abidjan (30 mai-03 juin). Inventaire physique tournant — Agence Programme (16-20 mai) : réalisé ; finalisation de la justification des écarts et rédaction du rapport en cours.",
@@ -138,7 +145,7 @@ function buildUserMessage(input: BriefLlmInput): string {
     lines.push(`  Action requise : ${r.expectedAction}`);
   }
 
-  lines.push('\nGénère les trois sections B, C et D en JSON selon le format et le style de l\'exemple.');
+  lines.push('\nAnalyse UNIQUEMENT les données ci-dessus et génère les sections B, C et D en JSON. Ne mentionne aucune activité, date, lieu ou risque absent de ces données.');
   return lines.join('\n');
 }
 
@@ -156,6 +163,15 @@ export class BriefLlmService {
   private readonly logger = new Logger(BriefLlmService.name);
 
   async generateSections(input: BriefLlmInput): Promise<BriefSections> {
+    const hasSubmissionData = input.submissions.some(
+      s => s.activities.length > 0 || s.plannedActivities.length > 0,
+    );
+    if (!hasSubmissionData && input.riskPoints.length === 0) {
+      throw new BadRequestException(
+        'Aucune donnée hebdomadaire disponible (activités ou points de vigilance) — brief non générable',
+      );
+    }
+
     const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
     const hasMistral   = !!process.env.MISTRAL_API_KEY;
 
