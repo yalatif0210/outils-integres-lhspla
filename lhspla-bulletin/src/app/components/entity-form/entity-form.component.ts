@@ -927,7 +927,7 @@ export class EntityFormComponent implements OnInit, OnDestroy {
     Object.values(this.saveTimers).forEach(t => clearTimeout(t));
     if (this.weekId) {
       for (const s of ['A', 'B', 'C', 'D']) {
-        this.api.releaseLock(this.weekId, this.entityCode, s).subscribe({ error: () => {} });
+        this.api.releaseLock(this.weekId, this.entityCode, s).subscribe({ error: () => { } });
       }
     }
   }
@@ -969,7 +969,8 @@ export class EntityFormComponent implements OnInit, OnDestroy {
         this.presencePollInterval = setInterval(() => this.pollPresence(), 15000);
         if (chiefName && chiefName !== savedResponsible) this.onFieldChange('A');
       }
-    } catch {
+    } catch (err: any) {
+      console.error('Error loading data: - entity-form.component.ts:973', err);
       this.snackBar.open('Erreur de chargement', 'OK', { duration: 4000 });
     } finally {
       this.loading.set(false);
