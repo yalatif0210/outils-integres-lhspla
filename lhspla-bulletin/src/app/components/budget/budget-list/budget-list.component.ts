@@ -359,7 +359,11 @@ export class BudgetListComponent implements OnInit {
     const fed = this.filterExactDate();
     let list = this.budgets();
     if (ft) list = list.filter(b => b.budgetType === ft);
-    if (fs) list = list.filter(b => b.status === fs);
+    if (fs) {
+      list = list.filter(b => b.status === fs);
+    } else if (this.auth.isChargeeTresorerie() && !this.auth.canReviewBudget()) {
+      list = list.filter(b => b.status === 'approved' || b.status === 'cloture');
+    }
     if (ff) list = list.filter(b => b.fundId === ff);
     if (fe) list = list.filter(b => b.entityCode === fe);
     if (fm) {
@@ -428,10 +432,6 @@ export class BudgetListComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Filtre automatique pour chargee_tresorerie
-    if (this.auth.isChargeeTresorerie() && !this.auth.canReviewBudget()) {
-      this.filterStatus.set('approved');
-    }
     Promise.all([
       this.api.getBudgets().toPromise(),
       this.api.getFinancingFunds().toPromise(),
