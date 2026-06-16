@@ -24,6 +24,9 @@ services:
       PGADMIN_LISTEN_PORT:      5050
     volumes:
       - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - lhspla-prod-net
+      - lhspla-stg-net
 
   # ── n8n (SMS notifications) — port 5678 ──────────────────────────────────────
   n8n:
