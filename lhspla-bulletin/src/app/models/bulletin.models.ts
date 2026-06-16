@@ -1,6 +1,15 @@
 export type CriticalityLevel = '🔴 Critique' | '🟠 Élevé' | '🟡 Modéré' | '🟢 Faible' | '';
 export type DosParticipation = '✅ OUI' | '❌ NON' | '';
 
+function generateId(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const h = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+
 export interface Activity {
   id: string;
   title: string;
@@ -75,15 +84,15 @@ export const CRITICALITY_OPTIONS: CriticalityLevel[] = [
 export const DOS_OPTIONS: DosParticipation[] = ['✅ OUI', '❌ NON'];
 
 export function createEmptyActivity(): Activity {
-  return { id: crypto.randomUUID(), title: '', objectives: '', location: '', dates: '', startDate: '', endDate: '', recommendations: '' };
+  return { id: generateId(), title: '', objectives: '', location: '', dates: '', startDate: '', endDate: '', recommendations: '' };
 }
 
 export function createEmptyPlannedActivity(): PlannedActivity {
-  return { id: crypto.randomUUID(), title: '', objectives: '', location: '', plannedDates: '', startDate: '', endDate: '', dosParticipation: '', observations: '' };
+  return { id: generateId(), title: '', objectives: '', location: '', plannedDates: '', startDate: '', endDate: '', dosParticipation: '', observations: '' };
 }
 
 export function createEmptyRiskPoint(): RiskPoint {
-  return { id: crypto.randomUUID(), theme: '', category: '', description: '', criticality: '', expectedAction: '' };
+  return { id: generateId(), theme: '', category: '', description: '', criticality: '', expectedAction: '' };
 }
 
 export function createEmptySubmission(entityCode: string): EntitySubmission {

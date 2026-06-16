@@ -969,8 +969,7 @@ export class EntityFormComponent implements OnInit, OnDestroy {
         this.presencePollInterval = setInterval(() => this.pollPresence(), 15000);
         if (chiefName && chiefName !== savedResponsible) this.onFieldChange('A');
       }
-    } catch (err: any) {
-      console.error('Error loading data: - entity-form.component.ts:973', err);
+    } catch {
       this.snackBar.open('Erreur de chargement', 'OK', { duration: 4000 });
     } finally {
       this.loading.set(false);
