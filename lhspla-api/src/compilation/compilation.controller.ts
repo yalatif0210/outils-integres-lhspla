@@ -37,7 +37,7 @@ export class CompilationController {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bulletin-'));
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn('python', [scriptPath, '--semaine', semaine, '--output-dir', tmpDir], {
+      const proc = spawn('python3', [scriptPath, '--semaine', semaine, '--output-dir', tmpDir], {
         windowsHide: true,
       });
 
