@@ -45,6 +45,7 @@ services:
       N8N_BASIC_AUTH_PASSWORD: ${N8N_PASSWORD}
       GENERIC_TIMEZONE:        Africa/Abidjan
       TZ:                      Africa/Abidjan
+      N8N_SECURE_COOKIE:       false
     volumes:
       - n8n-data:/home/node/.n8n
     networks:
