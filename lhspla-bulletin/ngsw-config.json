@@ -21,6 +21,9 @@
       "updateMode": "prefetch",
       "resources": {
         "files": [
+          "/favicon.png",
+          "/logo_lhspla_192.png",
+          "/logo_lhspla_512.png",
           "/logo_psp.png",
           "/logo_usaid.png",
           "/notification.mp3",
