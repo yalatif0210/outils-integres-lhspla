@@ -10,13 +10,19 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "any",
-      "type": "image/x-icon"
+      "src": "favicon.png",
+      "sizes": "64x64",
+      "type": "image/png"
     },
     {
-      "src": "logo_psp.png",
+      "src": "logo_lhspla_192.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "logo_lhspla_512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }

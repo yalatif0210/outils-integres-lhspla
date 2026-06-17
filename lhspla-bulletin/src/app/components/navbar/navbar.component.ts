@@ -495,8 +495,9 @@ import { ENTITIES } from '../../models/bulletin.models';
       position: fixed; inset: 0; z-index: 1099;
       background: rgba(0,0,0,0.45);
       opacity: 0; transition: opacity .25s;
+      pointer-events: none;
     }
-    .mobile-overlay.open { opacity: 1; }
+    .mobile-overlay.open { opacity: 1; pointer-events: auto; }
 
     /* ── Mobile drawer ───────────────────────────────────────────────────── */
     .mobile-drawer {
