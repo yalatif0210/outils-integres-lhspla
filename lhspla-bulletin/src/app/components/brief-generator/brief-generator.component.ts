@@ -192,7 +192,7 @@ function formatDate(d: any): string {
                 <div class="composante-block" *ngFor="let comp of preview().data.sectionB.composantes">
                   <div class="comp-label">▸ {{comp.code}} ({{comp.activities.length}} activité(s))</div>
                   <ul class="act-list">
-                    <li *ngFor="let a of comp.activities">{{a.title || '(sans titre)'}} — {{a.location || '—'}} — {{a.dates || '—'}}</li>
+                    <li *ngFor="let a of comp.activities">{{a.title || '(sans titre)'}} — {{a.location || '—'}} — {{fmtPreviewDate(a.startDate, a.endDate)}}</li>
                   </ul>
                 </div>
               </div>
@@ -207,7 +207,7 @@ function formatDate(d: any): string {
                 <div class="composante-block" *ngFor="let comp of preview().data.sectionC.composantes">
                   <div class="comp-label">▸ {{comp.code}} ({{comp.activities.length}} activité(s))</div>
                   <ul class="act-list">
-                    <li *ngFor="let a of comp.activities">{{a.title || '(sans titre)'}} — {{a.location || '—'}} — {{a.plannedDates || '—'}}
+                    <li *ngFor="let a of comp.activities">{{a.title || '(sans titre)'}} — {{a.location || '—'}} — {{fmtPreviewDate(a.startDate, a.endDate)}}
                       <span class="dos-badge" *ngIf="a.dosParticipation === 'oui'">DoS</span>
                     </li>
                   </ul>
@@ -442,6 +442,15 @@ export class BriefGeneratorComponent implements OnInit {
 
   formatDate = formatDate;
   fmtStatut(s: string): string { return s ? s.split('_').join(' ') : '—'; }
+
+  fmtPreviewDate(start: string | Date | null, end: string | Date | null): string {
+    const toDate = (v: string | Date | null) => v ? new Date(v) : null;
+    const s = toDate(start), e = toDate(end);
+    if (!s && !e) return '—';
+    const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+    if (s && e) return `${fmt(s)} – ${fmt(e)}`;
+    return fmt((s ?? e)!);
+  }
 
   // Champs éditables du draft
   draftB = '';

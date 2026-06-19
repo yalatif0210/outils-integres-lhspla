@@ -961,8 +961,17 @@ export class EntityFormComponent implements OnInit, OnDestroy {
       const savedResponsible = (sub.responsible as string | null)?.trim() ?? '';
       this.responsible = chiefName || savedResponsible;
       this.submissionDate = sub.submissionDate?.trim() || getNextMonday();
-      this.activities = sub.activities?.length ? [...sub.activities] : [createEmptyActivity()];
-      this.plannedActivities = sub.plannedActivities?.length ? [...sub.plannedActivities] : [createEmptyPlannedActivity()];
+      const toDateInput = (v: string | null | undefined) => v ? String(v).slice(0, 10) : '';
+      this.activities = (sub.activities?.length ? sub.activities : [createEmptyActivity()]).map((a: any) => ({
+        ...a,
+        startDate: toDateInput(a.startDate),
+        endDate:   toDateInput(a.endDate),
+      }));
+      this.plannedActivities = (sub.plannedActivities?.length ? sub.plannedActivities : [createEmptyPlannedActivity()]).map((a: any) => ({
+        ...a,
+        startDate: toDateInput(a.startDate),
+        endDate:   toDateInput(a.endDate),
+      }));
       this.riskPoints = sub.riskPoints?.length ? [...sub.riskPoints] : [createEmptyRiskPoint()];
 
       if (!this.isReadOnly()) {

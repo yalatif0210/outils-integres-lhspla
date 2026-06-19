@@ -70,7 +70,8 @@ export class SubmissionsController {
     @Param('entityCode') entityCode: string,
     @CurrentUser() user: any,
   ) {
-    if (!user.roles?.includes(Role.admin_system)) throw new ForbiddenException('Seul un admin peut réouvrir une saisie');
+    const canReopen = user.roles?.includes(Role.admin_system) || user.roles?.includes(Role.super_admin);
+    if (!canReopen) throw new ForbiddenException('Seul un admin peut réouvrir une saisie');
     return this.submissionsService.reopenSubmission(weekId, entityCode);
   }
 

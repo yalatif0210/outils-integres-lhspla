@@ -182,6 +182,14 @@ def _fmt_date(dt) -> str:
     return f"{parts[2]}/{parts[1]}/{parts[0]}" if len(parts) == 3 else str(dt)
 
 
+def _fmt_date_range(start, end) -> str:
+    """Retourne 'DD/MM/YYYY – DD/MM/YYYY' ou une seule date si l'autre est absente."""
+    s, e = _fmt_date(start), _fmt_date(end)
+    if s and e:
+        return f"{s} – {e}"
+    return s or e
+
+
 def _apply_comp_borders(ws):
     """Bordures pour COMPILATION et BulletinDu (7 colonnes)."""
     # R1 : en-tête fusion A:G — L seulement col1
@@ -506,7 +514,7 @@ def build_entity_sheet(ws, code: str, full_name: str, data: dict, week_ref: str,
         _w(ws, row, 3, pl.get("title", ""),               _fill(C_YELLOW), f9,  al_w)
         _w(ws, row, 4, pl.get("objectives", ""),          _fill(C_YELLOW), f9,  al_w)
         _w(ws, row, 5, pl.get("location", ""),            _fill(C_YELLOW), f9,  al_w)
-        _w(ws, row, 6, pl.get("plannedDates", ""),        _fill(C_YELLOW), f9,  ac_w)
+        _w(ws, row, 6, _fmt_date_range(pl.get("startDate"), pl.get("endDate")), _fill(C_YELLOW), f9, ac_w)
         _w(ws, row, 7, DOS_DISPLAY.get(dos_raw, dos_raw), _fill(C_YELLOW), f9,  ac)
         _w(ws, row, 8, pl.get("observations", ""),        _fill(C_YELLOW), f9,  al_w)
 
@@ -861,7 +869,7 @@ def build_bulletin_sheet(ws, week_ref: str, entity_names: dict, all_data: dict):
             _w(ws, cur, 2, pl.get("title", ""),               None, f9, al_w)
             _w(ws, cur, 3, pl.get("objectives", ""),          None, f9, al_w)
             _w(ws, cur, 4, pl.get("location", ""),            None, f9, al_w)
-            _w(ws, cur, 5, pl.get("plannedDates", ""),        None, f9, ac_w)
+            _w(ws, cur, 5, _fmt_date_range(pl.get("startDate"), pl.get("endDate")), None, f9, ac_w)
             _w(ws, cur, 6, DOS_DISPLAY.get(dos_raw, dos_raw), None, f9, ac)
             _w(ws, cur, 7, pl.get("observations", ""),        None, f9, al_w)
             cur += 1
