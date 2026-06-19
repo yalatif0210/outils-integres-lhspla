@@ -18,12 +18,14 @@ RUN npm run build
 # ── Stage 2: Production ──────────────────────────────────────────────────────
 FROM node:20-slim AS production
 
-# Python 3 + matplotlib pour generate_timeline_chart.py + curl pour healthchecks
+# Python 3 + dépendances scripts (timeline, bulletin Excel) + curl pour healthchecks
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       python3 \
       python3-matplotlib \
       python3-numpy \
+      python3-psycopg2 \
+      python3-openpyxl \
       curl \
     && rm -rf /var/lib/apt/lists/*
 
