@@ -29,6 +29,27 @@ export class CronService {
     this.logger.log(`Reminders sent for ${activeWeeks.length} active week(s)`);
   }
 
+  // Every Monday at 12:00 — auto-close active weeks whose weekEnd has passed
+  @Cron('0 12 * * 1', { timeZone: 'Africa/Abidjan' })
+  async autoCloseExpiredWeeks() {
+    this.logger.log('Running auto-close expired weeks cron...');
+    const now = new Date();
+    // Use midnight of this Monday as boundary so any week ending before today (Sunday or earlier) is matched
+    const thisMonday = new Date(now);
+    thisMonday.setHours(0, 0, 0, 0);
+    const expiredWeeks = await this.prisma.week.findMany({
+      where: { status: 'active', weekEnd: { lt: thisMonday } },
+    });
+    for (const week of expiredWeeks) {
+      await this.prisma.week.update({
+        where: { id: week.id },
+        data: { status: 'closed', closedAt: now },
+      });
+      this.logger.log(`Auto-closed week: ${week.weekReference}`);
+    }
+    this.logger.log(`Auto-closed ${expiredWeeks.length} expired week(s)`);
+  }
+
   // Every hour — cleanup expired section locks
   @Cron(CronExpression.EVERY_HOUR)
   async cleanupExpiredLocks() {
