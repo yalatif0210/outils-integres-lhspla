@@ -1,6 +1,17 @@
 export type CriticalityLevel = '🔴 Critique' | '🟠 Élevé' | '🟡 Modéré' | '🟢 Faible' | '';
 export type DosParticipation = '✅ OUI' | '❌ NON' | '';
 
+function getNextMonday(): string {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun, 1=Mon … 6=Sat
+  const daysUntil = day === 0 ? 1 : 8 - day;
+  const next = new Date(today);
+  next.setDate(today.getDate() + daysUntil);
+  return next.toLocaleDateString('fr-FR');
+}
+
+export { getNextMonday };
+
 function generateId(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
@@ -104,7 +115,7 @@ export function createEmptySubmission(entityCode: string): EntitySubmission {
     weekReference: '',
     weekStart: '',
     weekEnd: '',
-    submissionDate: new Date().toLocaleDateString('fr-FR'),
+    submissionDate: getNextMonday(),
     activities: [createEmptyActivity()],
     plannedActivities: [createEmptyPlannedActivity()],
     riskPoints: [createEmptyRiskPoint()],
