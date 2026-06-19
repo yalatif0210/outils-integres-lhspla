@@ -16,7 +16,8 @@ import { ApiService } from '../../services/api.service';
 import { AuthService } from '../../services/auth.service';
 import {
   ENTITIES, CRITICALITY_OPTIONS, DOS_OPTIONS,
-  createEmptyActivity, createEmptyPlannedActivity, createEmptyRiskPoint
+  createEmptyActivity, createEmptyPlannedActivity, createEmptyRiskPoint,
+  getNextMonday,
 } from '../../models/bulletin.models';
 import { firstValueFrom, Subscription } from 'rxjs';
 
@@ -959,7 +960,7 @@ export class EntityFormComponent implements OnInit, OnDestroy {
       const chiefName = (sub.entityChiefName as string | null)?.trim() ?? '';
       const savedResponsible = (sub.responsible as string | null)?.trim() ?? '';
       this.responsible = chiefName || savedResponsible;
-      this.submissionDate = sub.submissionDate ?? '';
+      this.submissionDate = sub.submissionDate?.trim() || getNextMonday();
       this.activities = sub.activities?.length ? [...sub.activities] : [createEmptyActivity()];
       this.plannedActivities = sub.plannedActivities?.length ? [...sub.plannedActivities] : [createEmptyPlannedActivity()];
       this.riskPoints = sub.riskPoints?.length ? [...sub.riskPoints] : [createEmptyRiskPoint()];

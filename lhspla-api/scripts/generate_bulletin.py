@@ -13,6 +13,7 @@ import argparse
 import os
 import shutil
 import sys
+import urllib.parse
 from datetime import datetime
 
 import psycopg2
@@ -950,9 +951,24 @@ def make_bulletin_tab_name(start: str, end: str) -> str:
 
 def main():
     ap = argparse.ArgumentParser(description="Génère le Bulletin Hebdomadaire LHSPLA-TA")
-    ap.add_argument("--semaine",    help="Date de début de semaine YYYY-MM-DD (défaut : dernière)")
-    ap.add_argument("--output-dir", default=SCRIPT_DIR, help="Répertoire de sortie")
+    ap.add_argument("--semaine",      help="Date de début de semaine YYYY-MM-DD (défaut : dernière)")
+    ap.add_argument("--output-dir",   default=SCRIPT_DIR, help="Répertoire de sortie")
+    ap.add_argument("--database-url", default="", help="PostgreSQL URL (postgresql://user:pass@host:port/db)")
     args = ap.parse_args()
+
+    # Override DB_DSN from DATABASE_URL if provided (needed in Docker where localhost != DB host)
+    global DB_DSN
+    if args.database_url:
+        parsed = urllib.parse.urlparse(args.database_url)
+        dbname = parsed.path.lstrip('/')
+        password = urllib.parse.unquote(parsed.password or '')
+        DB_DSN = (
+            f"host={parsed.hostname} "
+            f"port={parsed.port or 5432} "
+            f"dbname={dbname} "
+            f"user={parsed.username} "
+            f"password={password}"
+        )
 
     print("[1/6] Connexion a la base de donnees...")
     conn = db_connect()

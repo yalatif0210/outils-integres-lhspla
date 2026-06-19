@@ -147,7 +147,8 @@ import { firstValueFrom, forkJoin } from 'rxjs';
                             <th>Titre de l'activité</th>
                             <th>Objectifs</th>
                             <th class="col-loc">Lieu</th>
-                            <th class="col-date">Date(s)</th>
+                            <th class="col-date">Début</th>
+                            <th class="col-date">Fin</th>
                             <th>Recommandations / Résultats clés</th>
                           </tr>
                         </thead>
@@ -157,7 +158,8 @@ import { firstValueFrom, forkJoin } from 'rxjs';
                             <td>{{act.title}}</td>
                             <td>{{act.objectives}}</td>
                             <td class="col-loc">{{act.location}}</td>
-                            <td class="col-date">{{act.dates}}</td>
+                            <td class="col-date">{{fmtDate(act.startDate)}}</td>
+                            <td class="col-date">{{fmtDate(act.endDate)}}</td>
                             <td>{{act.recommendations}}</td>
                           </tr>
                         </tbody>
@@ -655,6 +657,12 @@ export class CompilationComponent implements OnInit {
     return map[level] ?? '';
   }
 
+  fmtDate(dt: string | null | undefined): string {
+    if (!dt) return '—';
+    const d = new Date(dt);
+    return isNaN(d.getTime()) ? String(dt) : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  }
+
   onMonthChange() {
     // Select first week of the filtered month (or keep current if still visible)
     const visible = this.filteredWeeks();
@@ -721,11 +729,11 @@ export class CompilationComponent implements OnInit {
           </div>
           <table><thead><tr class="thead-b">
             <th class="col-n">N°</th><th>Titre de l'activité</th><th>Objectifs</th>
-            <th class="col-sm">Lieu</th><th class="col-sm">Date(s)</th><th>Recommandations / Résultats clés</th>
+            <th class="col-sm">Lieu</th><th class="col-sm">Début</th><th class="col-sm">Fin</th><th>Recommandations / Résultats clés</th>
           </tr></thead><tbody>
           ${acts.map((a, i) => `<tr>
             <td class="col-n">${i + 1}</td><td>${a.title ?? ''}</td><td>${a.objectives ?? ''}</td>
-            <td>${a.location ?? ''}</td><td>${a.dates ?? ''}</td><td>${a.recommendations ?? ''}</td>
+            <td>${a.location ?? ''}</td><td>${this.fmtDate(a.startDate)}</td><td>${this.fmtDate(a.endDate)}</td><td>${a.recommendations ?? ''}</td>
           </tr>`).join('')}
           </tbody></table></div>`;
       }

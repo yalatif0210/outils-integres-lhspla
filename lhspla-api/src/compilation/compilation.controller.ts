@@ -35,11 +35,13 @@ export class CompilationController {
     }
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bulletin-'));
+    const databaseUrl = process.env.DATABASE_URL ?? '';
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn('python3', [scriptPath, '--semaine', semaine, '--output-dir', tmpDir], {
-        windowsHide: true,
-      });
+      const spawnArgs = [scriptPath, '--semaine', semaine, '--output-dir', tmpDir];
+      if (databaseUrl) spawnArgs.push('--database-url', databaseUrl);
+
+      const proc = spawn('python3', spawnArgs, { windowsHide: true });
 
       let stderr = '';
       proc.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
