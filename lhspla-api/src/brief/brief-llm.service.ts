@@ -7,6 +7,8 @@ export interface LlmActivity {
   objectives: string;
   location: string;
   dates: string;
+  startDate: Date | null;
+  endDate: Date | null;
   recommendations: string;
 }
 
@@ -14,8 +16,17 @@ export interface LlmPlannedActivity {
   title: string;
   location: string;
   plannedDates: string;
+  startDate: Date | null;
+  endDate: Date | null;
   dosParticipation: string | null;
   observations: string;
+}
+
+function fmtDateRange(start: Date | null, end: Date | null): string {
+  if (!start && !end) return '';
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  return fmt((start ?? end)!);
 }
 
 export interface LlmRiskPoint {
@@ -112,7 +123,8 @@ function buildUserMessage(input: BriefLlmInput): string {
       for (const a of sub.activities) {
         lines.push(`- Titre : ${a.title}`);
         if (a.location)        lines.push(`  Lieu : ${a.location}`);
-        if (a.dates)           lines.push(`  Dates : ${a.dates}`);
+        const dateStr = fmtDateRange(a.startDate, a.endDate) || a.dates;
+        if (dateStr)           lines.push(`  Dates : ${dateStr}`);
         if (a.objectives)      lines.push(`  Objectifs : ${a.objectives}`);
         if (a.recommendations) lines.push(`  Réalisations/Recommandations : ${a.recommendations}`);
       }
@@ -123,7 +135,8 @@ function buildUserMessage(input: BriefLlmInput): string {
       for (const a of sub.plannedActivities) {
         lines.push(`- Titre : ${a.title}`);
         if (a.location)         lines.push(`  Lieu : ${a.location}`);
-        if (a.plannedDates)     lines.push(`  Dates prévues : ${a.plannedDates}`);
+        const plannedDateStr = fmtDateRange(a.startDate, a.endDate) || a.plannedDates;
+        if (plannedDateStr)     lines.push(`  Dates prévues : ${plannedDateStr}`);
         if (a.dosParticipation === 'oui') lines.push(`  Participation DoS : OUI`);
         if (a.observations)     lines.push(`  Observations : ${a.observations}`);
       }

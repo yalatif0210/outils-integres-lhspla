@@ -43,6 +43,8 @@ interface ActivityRow {
   objectives: string;
   location: string;
   dates: string;
+  startDate: Date | null;
+  endDate: Date | null;
   recommendations: string;
 }
 
@@ -50,6 +52,8 @@ interface PlannedActivityRow {
   title: string;
   location: string;
   plannedDates: string;
+  startDate: Date | null;
+  endDate: Date | null;
   dosParticipation: string | null;
   observations: string;
 }
@@ -192,6 +196,13 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function fmtDateRange(start: Date | null, end: Date | null): string {
+  if (!start && !end) return '';
+  const fmt = (d: Date) => d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  return fmt((start ?? end)!);
+}
+
 // Lit largeur/hauteur en pixels depuis l'en-tête PNG (octets 16-23, big-endian)
 function getPngDimensions(buf: Buffer): { width: number; height: number } {
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
@@ -309,12 +320,16 @@ export class BriefService {
         objectives:      a.objectives,
         location:        a.location,
         dates:           a.dates,
+        startDate:       a.startDate,
+        endDate:         a.endDate,
         recommendations: a.recommendations,
       })),
       plannedActivities: s.plannedActivities.map(a => ({
         title:            a.title,
         location:         a.location,
         plannedDates:     a.plannedDates,
+        startDate:        a.startDate,
+        endDate:          a.endDate,
         dosParticipation: a.dosParticipation as string | null,
         observations:     a.observations,
       })),
@@ -404,7 +419,8 @@ export class BriefService {
                 .map(a => ({
                   title:           a.title,
                   location:        a.location,
-                  dates:           a.dates,
+                  startDate:       a.startDate,
+                  endDate:         a.endDate,
                   recommendations: a.recommendations,
                 })),
             })),
@@ -416,11 +432,12 @@ export class BriefService {
             .map(s => ({
               code: s.entityCode,
               activities: s.plannedActivities.map(a => ({
-                title:           a.title,
-                location:        a.location,
-                plannedDates:    a.plannedDates,
+                title:            a.title,
+                location:         a.location,
+                startDate:        a.startDate,
+                endDate:          a.endDate,
                 dosParticipation: a.dosParticipation,
-                observations:    a.observations,
+                observations:     a.observations,
               })),
             })),
         },
@@ -1266,8 +1283,11 @@ export class BriefService {
           for (const act of sub.activities) {
             if (!act.recommendations?.trim()) continue;
             if (act.title) {
+              const dateStr = fmtDateRange(act.startDate, act.endDate);
+              const locDate = [act.location, dateStr].filter(Boolean).join(' — ');
+              const titleText = locDate ? `${act.title}  (${locDate})` : act.title;
               children.push(new Paragraph({
-                children: [new TextRun({ text: act.title, bold: true, italics: true, size: pt(11), font: 'Calibri' })],
+                children: [new TextRun({ text: titleText, bold: true, italics: true, size: pt(11), font: 'Calibri' })],
                 spacing: { before: 80, after: 40 },
               }));
             }
@@ -1302,7 +1322,7 @@ export class BriefService {
           spacing: { before: 120, after: 80 },
         }));
         for (const { code, act } of dosItems) {
-          const parts = [code, act.title, act.location, act.plannedDates].filter(Boolean).join(' — ');
+          const parts = [code, act.title, act.location, fmtDateRange(act.startDate, act.endDate)].filter(Boolean).join(' — ');
           children.push(bullet(parts));
         }
       }
@@ -1318,7 +1338,7 @@ export class BriefService {
         for (const sub of sectionCSubs) {
           children.push(entityTitle(sub.entityCode));
           for (const act of sub.plannedActivities) {
-            const parts = [act.title, act.location, act.plannedDates, act.observations].filter(Boolean).join('  —  ');
+            const parts = [act.title, act.location, fmtDateRange(act.startDate, act.endDate), act.observations].filter(Boolean).join('  —  ');
             children.push(bullet(parts));
           }
         }

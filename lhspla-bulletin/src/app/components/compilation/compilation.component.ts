@@ -207,7 +207,8 @@ import { firstValueFrom, forkJoin } from 'rxjs';
                             <th>Titre de l'activité</th>
                             <th>Objectifs</th>
                             <th class="col-loc">Lieu</th>
-                            <th class="col-date">Dates prévues</th>
+                            <th class="col-date">Début</th>
+                            <th class="col-date">Fin</th>
                             <th class="col-dos">DoS ?</th>
                             <th>Observations</th>
                           </tr>
@@ -219,7 +220,8 @@ import { firstValueFrom, forkJoin } from 'rxjs';
                             <td>{{act.title}}</td>
                             <td>{{act.objectives}}</td>
                             <td class="col-loc">{{act.location}}</td>
-                            <td class="col-date">{{act.plannedDates}}</td>
+                            <td class="col-date">{{fmtDate(act.startDate)}}</td>
+                            <td class="col-date">{{fmtDate(act.endDate)}}</td>
                             <td class="col-dos">{{act.dosParticipation}}</td>
                             <td>{{act.observations}}</td>
                           </tr>
@@ -751,11 +753,11 @@ export class CompilationComponent implements OnInit {
           </div>
           <table><thead><tr class="thead-c">
             <th class="col-n">N°</th><th>Titre de l'activité</th><th>Objectifs</th>
-            <th class="col-sm">Lieu</th><th class="col-sm">Dates prévues</th><th class="col-dos">DoS ?</th><th>Observations</th>
+            <th class="col-sm">Lieu</th><th class="col-sm">Début</th><th class="col-sm">Fin</th><th class="col-dos">DoS ?</th><th>Observations</th>
           </tr></thead><tbody>
           ${acts.map((a, i) => `<tr${a.dosParticipation === '✅ OUI' ? ' class="dos-yes"' : ''}>
             <td class="col-n">${i + 1}</td><td>${a.title ?? ''}</td><td>${a.objectives ?? ''}</td>
-            <td>${a.location ?? ''}</td><td>${a.plannedDates ?? ''}</td>
+            <td>${a.location ?? ''}</td><td>${this.fmtDate(a.startDate)}</td><td>${this.fmtDate(a.endDate)}</td>
             <td style="text-align:center">${a.dosParticipation ?? '—'}</td><td>${a.observations ?? ''}</td>
           </tr>`).join('')}
           </tbody></table></div>`;
