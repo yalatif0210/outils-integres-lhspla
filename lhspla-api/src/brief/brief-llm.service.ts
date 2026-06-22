@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException, Logger } from '@nestjs/common';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,11 +190,25 @@ export class BriefLlmService {
 
     if (hasAnthropic) {
       this.logger.log('[BriefLLM] Utilisation de Claude (Anthropic)');
-      return this.callClaude(input);
+      try {
+        return await this.callClaude(input);
+      } catch (err: any) {
+        this.logger.error(`[BriefLLM] Erreur Claude : ${err?.message ?? err}`);
+        throw new InternalServerErrorException(
+          `Erreur API Claude : ${err?.message ?? 'erreur inconnue'}`
+        );
+      }
     }
     if (hasMistral) {
       this.logger.log('[BriefLLM] Utilisation de Mistral (fallback)');
-      return this.callMistral(input);
+      try {
+        return await this.callMistral(input);
+      } catch (err: any) {
+        this.logger.error(`[BriefLLM] Erreur Mistral : ${err?.message ?? err}`);
+        throw new InternalServerErrorException(
+          `Erreur API Mistral : ${err?.message ?? 'erreur inconnue'}`
+        );
+      }
     }
     throw new BadRequestException(
       'Aucune clé API LLM configurée — définissez ANTHROPIC_API_KEY ou MISTRAL_API_KEY dans .env'
