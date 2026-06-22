@@ -254,7 +254,7 @@ export class BriefLlmService {
   private async callMistral(input: BriefLlmInput): Promise<BriefSections> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Mistral } = require('@mistralai/mistralai');
-    const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+    const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY, timeout: 120000 });
 
     const MODEL   = 'mistral-large-latest';
     const userMsg = buildUserMessage(input);
