@@ -192,11 +192,7 @@ const QUILL_MODULES = {
                   <!-- Titre -->
                   @if (selectedType() !== 'comment') {
                     <mat-form-field appearance="outline">
-                      <mat-label>
-                        {{ selectedType() === 'milestone' ? 'Description du jalon *' :
-                           selectedType() === 'indicator' ? 'Intitulé de l\'indicateur *' :
-                           selectedType() === 'risk' ? 'Description du risque *' : 'Titre *' }}
-                      </mat-label>
+                      <mat-label>{{ titleLabel() }}</mat-label>
                       <input matInput formControlName="title" />
                     </mat-form-field>
                   }
@@ -391,6 +387,15 @@ export class ContributeComponent implements OnInit, OnDestroy {
   });
 
   selectedType = computed(() => (this.form.get('type')?.value as InputType) ?? 'comment');
+
+  titleLabel(): string {
+    switch (this.selectedType()) {
+      case 'milestone': return 'Description du jalon *';
+      case 'indicator': return "Intitulé de l'indicateur *";
+      case 'risk': return 'Description du risque *';
+      default: return 'Titre *';
+    }
+  }
 
   allowedTypes = computed<InputType[]>(() => {
     const section = this.currentSection();
