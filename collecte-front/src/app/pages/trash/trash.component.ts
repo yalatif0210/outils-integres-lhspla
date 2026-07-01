@@ -93,6 +93,9 @@ export class TrashComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
   auth = inject(AuthService);
 
+  readonly TYPE_LABELS = TYPE_LABELS;
+  readonly STATUS_LABELS = STATUS_LABELS;
+
   items = signal<Input[]>([]);
   loading = signal(true);
 

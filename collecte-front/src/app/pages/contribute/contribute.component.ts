@@ -326,7 +326,7 @@ const QUILL_MODULES = {
                       @if (submitting()) {
                         <mat-spinner diameter="20" style="margin:auto"></mat-spinner>
                       } @else {
-                        <mat-icon>send</mat-icon> Soumettre
+                        <ng-container><mat-icon>send</mat-icon> Soumettre</ng-container>
                       }
                     </button>
                   </div>
