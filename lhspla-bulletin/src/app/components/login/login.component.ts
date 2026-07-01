@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -192,6 +192,7 @@ import { AuthService } from '../../services/auth.service';
 export class LoginComponent {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   email = '';
   password = '';
@@ -206,6 +207,21 @@ export class LoginComponent {
 
     this.auth.login(this.email, this.password).subscribe({
       next: () => {
+        const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+        if (returnUrl) {
+          // Valider que le returnUrl est sur le même domaine (sécurité open-redirect)
+          try {
+            const parsed = new URL(returnUrl);
+            if (parsed.origin === window.location.origin) {
+              window.location.href = returnUrl;
+              return;
+            }
+          } catch {
+            // URL relative — sûre
+            window.location.href = returnUrl;
+            return;
+          }
+        }
         const user = this.auth.currentUser();
         if (user?.roles?.includes('entity_member') && !user?.roles?.some(r => ['super_admin','admin_system','chief_of_party','admin_tpm','admin_finance','assistant_direction'].includes(r))) {
           this.router.navigate(['/entity', user.entityCode]);

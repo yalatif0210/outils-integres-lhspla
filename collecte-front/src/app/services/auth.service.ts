@@ -44,7 +44,6 @@ export class AuthService {
   }
 
   logout(): void {
-    // On ne supprime PAS les tokens de l'app principale — on redirige simplement
     window.location.href = environment.mainAppUrl;
   }
 }
