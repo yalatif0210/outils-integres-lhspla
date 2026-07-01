@@ -20,8 +20,10 @@ COPY docker/frontend/nginx.conf /etc/nginx/templates/default.conf.template
 
 # API_HOST est le nom du container NestJS (stg-api ou prod-api)
 ENV API_HOST=api
+ENV COLLECTE_FRONT_HOST=collecte-front
+ENV COLLECTE_API_HOST=collecte-api
 
 EXPOSE 80
 
-# Substitue UNIQUEMENT ${API_HOST} — les variables nginx ($host, $remote_addr…) restent intactes
-CMD ["/bin/sh", "-c", "envsubst '${API_HOST}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+# Substitue les variables de service — les variables nginx ($host, $remote_addr…) restent intactes
+CMD ["/bin/sh", "-c", "envsubst '${API_HOST} ${COLLECTE_FRONT_HOST} ${COLLECTE_API_HOST}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

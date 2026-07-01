@@ -4,7 +4,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY collecte-api/package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 COPY collecte-api/ .
 RUN npx prisma generate
