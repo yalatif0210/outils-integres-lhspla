@@ -7,7 +7,7 @@ COPY collecte-api/package*.json ./
 RUN npm install --legacy-peer-deps
 
 COPY collecte-api/ .
-RUN npx prisma generate
+RUN DATABASE_URL=postgresql://x:x@localhost:5432/x npx prisma generate
 RUN npm run build
 
 # ── Runtime ───────────────────────────────────────────────────────────────────

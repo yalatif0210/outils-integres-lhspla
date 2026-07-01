@@ -6,7 +6,7 @@
     "build": "nest build",
     "start": "node dist/src/main",
     "start:dev": "nest start --watch",
-    "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint \"{src,test}/**/*.ts\""
   },
   "dependencies": {
@@ -17,7 +17,8 @@
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^8.0.0",
-    "@prisma/adapter-pg": "^6.0.0",
+    "@prisma/adapter-pg": "^7.7.0",
+    "@prisma/client": "^7.7.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "docx": "^8.5.0",
@@ -25,10 +26,13 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.13.0",
-    "prisma": "^6.0.0",
+    "prisma": "^7.7.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "tsx": "^4.19.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
