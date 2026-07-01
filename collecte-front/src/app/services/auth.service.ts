@@ -17,6 +17,8 @@ export class AuthService {
   readonly currentUser = this.userSignal.asReadonly();
   readonly isLoggedIn = computed(() => !!this.userSignal());
   readonly entityCode = computed(() => this.userSignal()?.entityCode ?? null);
+  readonly isSuperAdmin = computed(() => this.userSignal()?.roles?.includes('super_admin') ?? false);
+  readonly isPmo = computed(() => this.userSignal()?.entityCode === 'PMO');
 
   private loadUser(): CollecteUser | null {
     try {

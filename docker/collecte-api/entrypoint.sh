@@ -18,8 +18,11 @@ client.connect()
   .catch(e => { console.error(e); client.end(); process.exit(1); });
 "
 
-echo "▶ Prisma db push (creation des tables si absentes)..."
+echo "▶ Prisma db push (schema incremental)..."
 npx prisma db push --accept-data-loss
+
+echo "▶ Seed idempotent (upsert input_types + entités + sections)..."
+npx tsx prisma/seed.ts
 
 echo "▶ Démarrage NestJS collecte-api..."
 exec node dist/src/main

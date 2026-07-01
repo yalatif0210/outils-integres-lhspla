@@ -25,6 +25,7 @@ model ReferenceSection {
   entites          String[]
   ordre            Int      @unique
   contributionMode String   @default("lecture_seule")
+  inputTypes       String[] @default([])
   texteReference   String
 
   inputs Input[]
@@ -55,7 +56,7 @@ model Input {
 
   type    InputType
   title   String?
-  content String
+  content String   @default("")
 
   means              String?
   output             String?
@@ -63,7 +64,31 @@ model Input {
   targetValue        String?
   dueMonth           String?
 
-  status InputStatus @default(draft)
+  // Type activite
+  objective String?
+  sourceRef String?
+
+  // Type jalon
+  deliverable           String?
+  paymentAmountProposed String?
+  paymentAmountFinal    String?
+
+  // Type indicateur
+  baseline   String?
+  dataSource String?
+  frequency  String?
+
+  // Type risque
+  likelihood String?
+  impact     String?
+  mitigation String?
+
+  // Type commentaire
+  targetRef String?
+
+  status    InputStatus @default(draft)
+  deletedAt DateTime?
+  deletedBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
