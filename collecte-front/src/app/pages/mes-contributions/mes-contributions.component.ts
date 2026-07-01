@@ -44,7 +44,7 @@ const STATUS_LABELS: Record<InputStatus, string> = {
         <div>
           <h1 style="margin:0; font-size:22px; font-weight:600">Mes contributions</h1>
           <p style="margin:4px 0 0; color:#666; font-size:14px">
-            {{ showEntityView ? 'Tous les inputs de l\'entité ' + auth.entityCode() : 'Vos inputs personnels' }}
+            {{ showEntityView ? "Tous les inputs de l'entité " + auth.entityCode() : "Vos inputs personnels" }}
           </p>
         </div>
         <span style="flex:1"></span>
