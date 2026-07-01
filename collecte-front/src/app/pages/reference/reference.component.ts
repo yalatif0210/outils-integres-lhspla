@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatBadgeModule } from '@angular/material/badge';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
+import { MarkdownPipe } from '../../pipes/markdown.pipe';
 
 const OBJECTIF_LABELS: Record<string, string> = {
   obj1: 'Obj. 1 - Gouvernance',
@@ -34,7 +35,7 @@ const CONTRIBUTION_ICONS: Record<string, string> = {
   selector: 'app-reference',
   standalone: true,
   imports: [
-    CommonModule, RouterLink,
+    CommonModule, RouterLink, MarkdownPipe,
     MatCardModule, MatButtonModule, MatIconModule,
     MatChipsModule, MatProgressSpinnerModule, MatExpansionModule, MatBadgeModule,
   ],
@@ -97,7 +98,7 @@ const CONTRIBUTION_ICONS: Record<string, string> = {
                 }
               </div>
 
-              <div class="reference-text">{{ section.texteReference }}</div>
+              <div class="reference-text" [innerHTML]="section.texteReference | markdown"></div>
 
               @if (section.contributionMode !== 'lecture_seule') {
                 <div style="margin-top:12px; text-align:right">
