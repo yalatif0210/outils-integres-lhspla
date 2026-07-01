@@ -16,6 +16,7 @@ import { MatListModule } from '@angular/material/list';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
 import { InputsService, Input, InputType, InputStatus } from '../../services/inputs.service';
 import { AuthService } from '../../services/auth.service';
+import { MarkdownPipe } from '../../pipes/markdown.pipe';
 
 const TYPE_LABELS: Record<InputType, string> = {
   activity: 'Activité',
@@ -36,7 +37,7 @@ const STATUS_LABELS: Record<InputStatus, string> = {
   selector: 'app-contribute',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, ReactiveFormsModule,
+    CommonModule, RouterLink, ReactiveFormsModule, MarkdownPipe,
     MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatChipsModule, MatProgressSpinnerModule,
     MatSnackBarModule, MatDividerModule, MatListModule,
@@ -78,9 +79,8 @@ const STATUS_LABELS: Record<InputStatus, string> = {
                     &nbsp;·&nbsp;
                     <strong>Entités :</strong> {{ currentSection()!.entites.join(', ') }}
                   </p>
-                  <div class="reference-text" style="max-height:300px; overflow:auto; font-size:13px">
-                    {{ currentSection()!.texteReference }}
-                  </div>
+                  <div class="reference-text" style="max-height:300px; overflow:auto; font-size:13px"
+                       [innerHTML]="currentSection()!.texteReference | markdown"></div>
                 </div>
               }
             </mat-card-content>
