@@ -2,8 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
+const dbUrl = new URL(process.env.DATABASE_URL ?? '');
+const schema = dbUrl.searchParams.get('schema') ?? 'public';
+dbUrl.searchParams.delete('schema');
+const pool = new Pool({ connectionString: dbUrl.toString() });
+const adapter = new PrismaPg(pool, { schema });
 const prisma = new PrismaClient({ adapter } as any);
 
 const ENTITIES = [
