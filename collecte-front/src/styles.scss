@@ -122,3 +122,13 @@ quill-editor {
   padding: 2px 8px;
   border-radius: 12px;
 }
+
+/* Tooltip consolidation — rendu dans l'overlay CDK hors composant, doit être global */
+.mat-mdc-tooltip.multiline-tooltip .mdc-tooltip__surface {
+  max-width: 700px !important;
+  min-width: 300px !important;
+  white-space: pre-line !important;
+  font-size: 13px !important;
+  line-height: 1.7 !important;
+  padding: 10px 14px !important;
+}

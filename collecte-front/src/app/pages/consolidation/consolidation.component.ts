@@ -279,15 +279,6 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
     </div>
   `,
   styles: [`
-    /* Tooltip multiline */
-    ::ng-deep .multiline-tooltip {
-      white-space: pre-line !important;
-      max-width: 500px !important;
-      min-width: 260px !important;
-      font-size: 13px !important;
-      line-height: 1.7 !important;
-    }
-
     /* Tableau natif */
     .cons-table {
       width: 100%;
