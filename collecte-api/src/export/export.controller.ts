@@ -1,7 +1,11 @@
-import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, Request, UseGuards, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ExportService } from './export.service';
+
+function canExportGlobal(user: any): boolean {
+  return user?.roles?.includes('super_admin') || user?.entityCode === 'PMO';
+}
 
 @Controller('export')
 @UseGuards(JwtAuthGuard)
@@ -9,7 +13,10 @@ export class ExportController {
   constructor(private exportService: ExportService) {}
 
   @Get('global/docx')
-  async globalDocx(@Res() res: Response) {
+  async globalDocx(@Request() req: any, @Res() res: Response) {
+    if (!canExportGlobal(req.user)) {
+      throw new ForbiddenException('Export global réservé au Super Admin et au PMO.');
+    }
     const buffer = await this.exportService.exportDocx();
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -19,7 +26,10 @@ export class ExportController {
   }
 
   @Get('global/xlsx')
-  async globalXlsx(@Res() res: Response) {
+  async globalXlsx(@Request() req: any, @Res() res: Response) {
+    if (!canExportGlobal(req.user)) {
+      throw new ForbiddenException('Export global réservé au Super Admin et au PMO.');
+    }
     const buffer = await this.exportService.exportXlsx();
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -29,7 +39,10 @@ export class ExportController {
   }
 
   @Get('global/json')
-  async globalJson() {
+  async globalJson(@Request() req: any) {
+    if (!canExportGlobal(req.user)) {
+      throw new ForbiddenException('Export global réservé au Super Admin et au PMO.');
+    }
     return this.exportService.exportJson();
   }
 
