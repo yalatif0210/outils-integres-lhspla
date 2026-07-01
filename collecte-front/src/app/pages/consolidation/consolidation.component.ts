@@ -19,7 +19,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { InputsService, Input, InputStatus } from '../../services/inputs.service';
 import { SectionsService } from '../../services/sections.service';
 import { AuthService } from '../../services/auth.service';
-import { environment } from '../../../environments/environment';
 import { htmlToText } from '../../pipes/markdown.pipe';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -51,21 +50,24 @@ const TYPE_LABELS: Record<string, string> = {
               <mat-icon>delete_sweep</mat-icon> Corbeille (SA)
             </a>
           }
-          <a mat-stroked-button [href]="exportDocxUrl" target="_blank">
-            <mat-icon>description</mat-icon> Export Word global
-          </a>
-          <a mat-stroked-button [href]="exportXlsxUrl" target="_blank">
-            <mat-icon>table_chart</mat-icon> Export Excel global
-          </a>
+          @if (auth.isSuperAdmin() || auth.isPmo()) {
+            <a mat-stroked-button [href]="exportDocxUrl" target="_blank">
+              <mat-icon>description</mat-icon> Export Word global
+            </a>
+            <a mat-stroked-button [href]="exportXlsxUrl" target="_blank">
+              <mat-icon>table_chart</mat-icon> Export Excel global
+            </a>
+          }
         </div>
       </div>
 
       <!-- Filtres -->
       <mat-card style="margin-bottom:16px">
         <mat-card-content style="padding:12px; display:flex; gap:16px; flex-wrap:wrap; align-items:center">
+
           <mat-form-field appearance="outline" style="min-width:200px">
             <mat-label>Axe</mat-label>
-            <mat-select [(ngModel)]="filterSection" (ngModelChange)="applyFilters()">
+            <mat-select [ngModel]="filterSection()" (ngModelChange)="filterSection.set($event)">
               <mat-option value="">Tous</mat-option>
               @for (s of sections(); track s.id) {
                 <mat-option [value]="s.id">{{ s.titre | slice:0:40 }}...</mat-option>
@@ -74,8 +76,18 @@ const TYPE_LABELS: Record<string, string> = {
           </mat-form-field>
 
           <mat-form-field appearance="outline" style="min-width:140px">
+            <mat-label>Entité</mat-label>
+            <mat-select [ngModel]="filterEntity()" (ngModelChange)="filterEntity.set($event)">
+              <mat-option value="">Toutes</mat-option>
+              @for (code of entityCodes(); track code) {
+                <mat-option [value]="code">{{ code }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" style="min-width:140px">
             <mat-label>Statut</mat-label>
-            <mat-select [(ngModel)]="filterStatus" (ngModelChange)="applyFilters()">
+            <mat-select [ngModel]="filterStatus()" (ngModelChange)="filterStatus.set($event)">
               <mat-option value="">Tous</mat-option>
               <mat-option value="draft">Brouillon</mat-option>
               <mat-option value="submitted">Soumis</mat-option>
@@ -86,7 +98,7 @@ const TYPE_LABELS: Record<string, string> = {
 
           <mat-form-field appearance="outline" style="min-width:140px">
             <mat-label>Type</mat-label>
-            <mat-select [(ngModel)]="filterType" (ngModelChange)="applyFilters()">
+            <mat-select [ngModel]="filterType()" (ngModelChange)="filterType.set($event)">
               <mat-option value="">Tous</mat-option>
               <mat-option value="activity">Activité</mat-option>
               <mat-option value="indicator">Indicateur</mat-option>
@@ -120,37 +132,43 @@ const TYPE_LABELS: Record<string, string> = {
         <mat-table [dataSource]="filtered()" style="width:100%; background:white; border-radius:4px">
 
           <ng-container matColumnDef="section">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Axe</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="font-size:13px; color:#555">
-              {{ row.referenceSection?.titre | slice:0:30 }}...
+            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:130px">Axe</mat-header-cell>
+            <mat-cell *matCellDef="let row" style="font-size:12px; color:#555; min-width:130px; word-break:break-word; white-space:normal; padding:6px 8px"
+                      [matTooltip]="row.referenceSection?.titre" matTooltipShowDelay="400">
+              {{ row.referenceSection?.titre | slice:0:35 }}...
             </mat-cell>
           </ng-container>
 
           <ng-container matColumnDef="entity">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Entité</mat-header-cell>
-            <mat-cell *matCellDef="let row">
+            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:70px">Entité</mat-header-cell>
+            <mat-cell *matCellDef="let row" style="min-width:70px">
               <span class="section-badge">{{ row.entity.code }}</span>
             </mat-cell>
           </ng-container>
 
           <ng-container matColumnDef="type">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Type</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="font-size:13px">{{ TYPE_LABELS[row.type] }}</mat-cell>
+            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:90px">Type</mat-header-cell>
+            <mat-cell *matCellDef="let row" style="font-size:13px; min-width:90px">{{ TYPE_LABELS[row.type] }}</mat-cell>
           </ng-container>
 
           <ng-container matColumnDef="content">
             <mat-header-cell *matHeaderCellDef style="font-weight:700">Contribution</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="flex-direction:column; align-items:start; padding:8px 0">
+            <mat-cell *matCellDef="let row"
+                      style="flex-direction:column; align-items:start; padding:8px; cursor:pointer; word-break:break-word; white-space:normal; max-width:420px"
+                      [matTooltip]="tooltipText(row)"
+                      matTooltipClass="multiline-tooltip"
+                      matTooltipShowDelay="300"
+                      matTooltipPosition="left">
               @if (row.title) {
-                <div style="font-weight:500; font-size:13px">{{ row.title }}</div>
+                <div style="font-weight:700; font-size:13px; margin-bottom:2px">{{ row.title }}</div>
               }
               @if (row.content) {
-                <div class="rich-content" style="color:#444" [innerHTML]="preview(row.content)"></div>
+                <div class="rich-content" style="color:#444; font-size:12px" [innerHTML]="preview(row.content)"></div>
               }
               @if (row.type === 'milestone' && row.paymentAmountProposed) {
                 <div style="font-size:11px; color:#666; margin-top:2px">
                   Proposé : {{ row.paymentAmountProposed }}
-                  @if (row.paymentAmountFinal) { → Final : <strong>{{ row.paymentAmountFinal }}</strong> }
+                  @if (row.paymentAmountFinal) { <span> → Final : <strong>{{ row.paymentAmountFinal }}</strong></span> }
                 </div>
               }
               <div style="font-size:11px; color:#888; margin-top:4px">
@@ -160,8 +178,8 @@ const TYPE_LABELS: Record<string, string> = {
           </ng-container>
 
           <ng-container matColumnDef="status">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Statut</mat-header-cell>
-            <mat-cell *matCellDef="let row">
+            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:90px">Statut</mat-header-cell>
+            <mat-cell *matCellDef="let row" style="min-width:90px">
               <span [class]="'chip-' + row.status"
                     style="padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600">
                 {{ statusLabel(row.status) }}
@@ -170,8 +188,8 @@ const TYPE_LABELS: Record<string, string> = {
           </ng-container>
 
           <ng-container matColumnDef="actions">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Actions PMO</mat-header-cell>
-            <mat-cell *matCellDef="let row">
+            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:160px">Actions PMO</mat-header-cell>
+            <mat-cell *matCellDef="let row" style="min-width:160px">
               <div style="display:flex; flex-direction:column; gap:4px; padding:4px 0">
                 @if (row.status === 'submitted' || row.status === 'retained' || row.status === 'rejected') {
                   <div style="display:flex; gap:4px">
@@ -224,7 +242,14 @@ const TYPE_LABELS: Record<string, string> = {
       }
     </div>
   `,
-  styles: [``],
+  styles: [`
+    ::ng-deep .multiline-tooltip {
+      white-space: pre-line !important;
+      max-width: 420px !important;
+      font-size: 12px !important;
+      line-height: 1.5 !important;
+    }
+  `],
 })
 export class ConsolidationComponent implements OnInit {
   private inputsService = inject(InputsService);
@@ -238,9 +263,10 @@ export class ConsolidationComponent implements OnInit {
   sections = signal<any[]>([]);
   loading = signal(true);
 
-  filterSection = '';
-  filterStatus = '';
-  filterType = '';
+  filterSection = signal('');
+  filterStatus = signal('');
+  filterType = signal('');
+  filterEntity = signal('');
 
   displayedColumns = ['section', 'entity', 'type', 'content', 'status', 'actions'];
 
@@ -251,11 +277,21 @@ export class ConsolidationComponent implements OnInit {
     return this.inputsService.exportDocx(sectionId);
   }
 
+  entityCodes = computed(() => {
+    const codes = new Set(this.allInputs().map(i => i.entity.code));
+    return Array.from(codes).sort();
+  });
+
   filtered = computed(() => {
+    const sec = this.filterSection();
+    const sta = this.filterStatus();
+    const typ = this.filterType();
+    const ent = this.filterEntity();
     return this.allInputs().filter(i => {
-      if (this.filterSection && i.referenceSectionId !== this.filterSection) return false;
-      if (this.filterStatus && i.status !== this.filterStatus) return false;
-      if (this.filterType && i.type !== this.filterType) return false;
+      if (sec && i.referenceSectionId !== sec) return false;
+      if (sta && i.status !== sta) return false;
+      if (typ && i.type !== typ) return false;
+      if (ent && i.entity.code !== ent) return false;
       return true;
     });
   });
@@ -281,8 +317,6 @@ export class ConsolidationComponent implements OnInit {
     });
   }
 
-  applyFilters() { /* computed signal auto-updates */ }
-
   statusLabel(status: InputStatus): string {
     const labels: Record<InputStatus, string> = {
       draft: 'Brouillon', submitted: 'Soumis', retained: 'Retenu', rejected: 'Rejeté',
@@ -291,6 +325,24 @@ export class ConsolidationComponent implements OnInit {
   }
 
   preview(html: string): string { return htmlToText(html, 120); }
+
+  tooltipText(row: any): string {
+    const parts: string[] = [];
+    if (row.title) parts.push(`[Titre] ${row.title}`);
+    if (row.content) parts.push(htmlToText(row.content, 800));
+    if (row.means) parts.push(`Intrant : ${row.means}`);
+    if (row.output) parts.push(`Extrant : ${row.output}`);
+    if (row.verificationMethod) parts.push(`Vérification : ${row.verificationMethod}`);
+    if (row.targetValue) parts.push(`Valeur cible : ${row.targetValue}`);
+    if (row.dueMonth) parts.push(`Échéance : ${row.dueMonth}`);
+    if (row.likelihood) parts.push(`Probabilité : ${row.likelihood}`);
+    if (row.impact) parts.push(`Impact : ${row.impact}`);
+    if (row.mitigation) parts.push(`Atténuation : ${row.mitigation}`);
+    if (row.objective) parts.push(`Objectif : ${row.objective}`);
+    if (row.dataSource) parts.push(`Source : ${row.dataSource}`);
+    if (row.frequency) parts.push(`Fréquence : ${row.frequency}`);
+    return parts.join('\n');
+  }
 
   retain(input: Input) {
     this.inputsService.updatePmo(input.id, { status: 'retained' }).subscribe({

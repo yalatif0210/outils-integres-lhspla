@@ -89,6 +89,22 @@ body {
   }
 }
 
+quill-editor {
+  width: 100%;
+  display: block;
+}
+
+.ql-editor {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.ql-container {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
 /* HTML sauvegardé depuis Quill */
 .rich-content {
   font-size: 13px; line-height: 1.6;

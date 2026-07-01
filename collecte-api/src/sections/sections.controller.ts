@@ -1,9 +1,7 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Controller, Get, Param } from '@nestjs/common';
 import { SectionsService } from './sections.service';
 
 @Controller('sections')
-@UseGuards(JwtAuthGuard)
 export class SectionsController {
   constructor(private sectionsService: SectionsService) {}
 

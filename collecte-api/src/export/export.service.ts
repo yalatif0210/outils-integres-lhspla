@@ -6,6 +6,10 @@ import {
 } from 'docx';
 import * as ExcelJS from 'exceljs';
 
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 const INPUT_TYPE_LABELS: Record<string, string> = {
   activity: 'Activité',
   indicator: 'Indicateur',
@@ -72,7 +76,7 @@ export class ExportService {
             new Paragraph({
               children: [
                 new TextRun({ text: `[${INPUT_TYPE_LABELS[input.type] ?? input.type}] `, bold: true }),
-                new TextRun({ text: input.title ?? '' }),
+                new TextRun({ text: input.title ?? '', bold: true }),
               ],
               heading: HeadingLevel.HEADING_2,
             }),
@@ -84,7 +88,7 @@ export class ExportService {
                 new TextRun({ text: input.author.email }),
               ],
             }),
-            new Paragraph({ text: input.content }),
+            new Paragraph({ text: stripHtml(input.content) }),
           );
 
           if (input.means) children.push(new Paragraph({ children: [new TextRun({ text: 'Intrant : ', bold: true }), new TextRun({ text: input.means })] }));
