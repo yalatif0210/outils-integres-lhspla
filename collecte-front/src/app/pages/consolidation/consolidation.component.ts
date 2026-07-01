@@ -1,6 +1,6 @@
 import {
   Component, inject, signal, OnInit, computed, effect, untracked,
-  ElementRef, ViewChild, NgZone,
+  ElementRef, ViewChild, NgZone, HostListener,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -133,152 +133,375 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       }
 
       @if (!loading()) {
-        <div style="border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.12); background:white">
+        <!-- Layout flex : tableau + panneau latéral -->
+        <div class="content-with-panel">
 
-          <!-- Tableau natif avec colgroup pour resize -->
-          <div #tableWrapper style="overflow-x:auto">
-            <table class="cons-table">
-              <colgroup>
-                <col [style.width.px]="cw.section()">
-                <col [style.width.px]="cw.entity()">
-                <col [style.width.px]="cw.type()">
-                <col [style.width.px]="cw.content()">
-                <col [style.width.px]="cw.status()">
-                <col [style.width.px]="cw.actions()">
-              </colgroup>
-              <thead>
-                <tr>
-                  <th><span>Axe</span><div class="rh" (mousedown)="startResize($event,'section')"></div></th>
-                  <th><span>Entité</span><div class="rh" (mousedown)="startResize($event,'entity')"></div></th>
-                  <th><span>Type</span><div class="rh" (mousedown)="startResize($event,'type')"></div></th>
-                  <th><span>Contribution</span><div class="rh" (mousedown)="startResize($event,'content')"></div></th>
-                  <th><span>Statut</span><div class="rh" (mousedown)="startResize($event,'status')"></div></th>
-                  <th><span>Actions PMO</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                @if (paginated().length === 0) {
-                  <tr>
-                    <td colspan="6" style="text-align:center; padding:40px; color:#999">
-                      <mat-icon style="font-size:36px; display:block; margin-bottom:8px">inbox</mat-icon>
-                      Aucun input avec ces filtres
-                    </td>
-                  </tr>
-                }
-                @for (row of paginated(); track row.id) {
-                  <tr [style.height.px]="rowHeights()[row.id]">
-                    <!-- Axe — texte complet, CSS gère la troncature selon la largeur -->
-                    <td class="td-axe"
-                        [matTooltip]="row.referenceSection?.titre ?? ''"
-                        matTooltipShowDelay="400">
-                      {{ row.referenceSection?.titre }}
-                      <div class="row-rh" (mousedown)="startRowResize($event, row.id)"></div>
-                    </td>
+          <!-- Section tableau -->
+          <div class="table-section">
+            <div style="border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.12); background:white">
 
-                    <!-- Entité -->
-                    <td>
-                      <span class="section-badge">{{ row.entity.code }}</span>
-                    </td>
+              <!-- Tableau natif avec colgroup pour resize -->
+              <div #tableWrapper style="overflow-x:auto">
+                <table class="cons-table">
+                  <colgroup>
+                    <col [style.width.px]="cw.section()">
+                    <col [style.width.px]="cw.entity()">
+                    <col [style.width.px]="cw.type()">
+                    <col [style.width.px]="cw.content()">
+                    <col [style.width.px]="cw.status()">
+                    <col [style.width.px]="cw.actions()">
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th><span>Axe</span><div class="rh" (mousedown)="startResize($event,'section')"></div></th>
+                      <th><span>Entité</span><div class="rh" (mousedown)="startResize($event,'entity')"></div></th>
+                      <th><span>Type</span><div class="rh" (mousedown)="startResize($event,'type')"></div></th>
+                      <th><span>Contribution</span><div class="rh" (mousedown)="startResize($event,'content')"></div></th>
+                      <th><span>Statut</span><div class="rh" (mousedown)="startResize($event,'status')"></div></th>
+                      <th><span>Actions PMO</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @if (paginated().length === 0) {
+                      <tr>
+                        <td colspan="6" style="text-align:center; padding:40px; color:#999">
+                          <mat-icon style="font-size:36px; display:block; margin-bottom:8px">inbox</mat-icon>
+                          Aucun input avec ces filtres
+                        </td>
+                      </tr>
+                    }
+                    @for (row of paginated(); track row.id) {
+                      <tr [style.height.px]="rowHeights()[row.id]"
+                          [class.row-selected]="selectedRow()?.id === row.id"
+                          (click)="selectRow(row)"
+                          style="cursor:pointer">
 
-                    <!-- Type -->
-                    <td style="font-size:13px">{{ TYPE_LABELS[row.type] }}</td>
+                        <!-- Axe -->
+                        <td class="td-axe"
+                            [matTooltip]="row.referenceSection?.titre ?? ''"
+                            matTooltipShowDelay="400">
+                          {{ row.referenceSection?.titre }}
+                          <div class="row-rh" (mousedown)="startRowResize($event, row.id)"></div>
+                        </td>
 
-                    <!-- Contribution -->
-                    <td class="td-content"
-                        [matTooltip]="tooltipText(row)"
-                        matTooltipClass="multiline-tooltip"
-                        matTooltipShowDelay="300"
-                        matTooltipPosition="left">
-                      @if (row.title) {
-                        <div style="font-weight:700; font-size:13px; margin-bottom:2px">{{ row.title }}</div>
-                      }
-                      @if (row.content) {
-                        <div class="rich-content" style="color:#444; font-size:12px" [innerHTML]="preview(row.content)"></div>
-                      }
-                      @if (row.type === 'milestone' && row.paymentAmountProposed) {
-                        <div style="font-size:11px; color:#666; margin-top:2px">
-                          Proposé : {{ row.paymentAmountProposed }}
-                          @if (row.paymentAmountFinal) {
-                            <span> → Final : <strong>{{ row.paymentAmountFinal }}</strong></span>
+                        <!-- Entité -->
+                        <td>
+                          <span class="section-badge">{{ row.entity.code }}</span>
+                        </td>
+
+                        <!-- Type -->
+                        <td style="font-size:13px">{{ TYPE_LABELS[row.type] }}</td>
+
+                        <!-- Contribution -->
+                        <td class="td-content">
+                          @if (row.title) {
+                            <div style="font-weight:700; font-size:13px; margin-bottom:2px">{{ row.title }}</div>
                           }
-                        </div>
-                      }
-                      <div style="font-size:11px; color:#888; margin-top:4px">
-                        {{ row.author.email }} · {{ row.updatedAt | date:'dd/MM/yyyy HH:mm' }}
-                      </div>
-                    </td>
+                          @if (row.content) {
+                            <div style="color:#444; font-size:12px">{{ preview(row.content) }}</div>
+                          }
+                          @if (row.type === 'milestone' && row.paymentAmountProposed) {
+                            <div style="font-size:11px; color:#666; margin-top:2px">
+                              Proposé : {{ row.paymentAmountProposed }}
+                              @if (row.paymentAmountFinal) {
+                                <span> → Final : <strong>{{ row.paymentAmountFinal }}</strong></span>
+                              }
+                            </div>
+                          }
+                          <div style="font-size:11px; color:#888; margin-top:4px">
+                            {{ row.author.email }} · {{ row.updatedAt | date:'dd/MM/yyyy HH:mm' }}
+                          </div>
+                        </td>
 
-                    <!-- Statut -->
-                    <td>
-                      <span [class]="'chip-' + row.status"
-                            style="padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; white-space:nowrap; display:inline-block">
-                        {{ statusLabel(row.status) }}
-                      </span>
-                    </td>
+                        <!-- Statut -->
+                        <td>
+                          <span [class]="'chip-' + row.status"
+                                style="padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; white-space:nowrap; display:inline-block">
+                            {{ statusLabel(row.status) }}
+                          </span>
+                        </td>
 
-                    <!-- Actions -->
-                    <td>
-                      <div style="display:flex; flex-direction:column; gap:4px">
-                        @if (row.status === 'submitted' || row.status === 'retained' || row.status === 'rejected') {
-                          <div style="display:flex; gap:2px">
-                            <button mat-icon-button color="primary" (click)="retain(row)"
-                                    matTooltip="Retenir" [disabled]="row.status === 'retained'">
-                              <mat-icon>check_circle</mat-icon>
-                            </button>
-                            <button mat-icon-button color="warn" (click)="reject(row)"
-                                    matTooltip="Rejeter" [disabled]="row.status === 'rejected'">
-                              <mat-icon>cancel</mat-icon>
+                        <!-- Actions — stopPropagation pour ne pas ouvrir le panneau -->
+                        <td (click)="$event.stopPropagation()">
+                          <div style="display:flex; flex-direction:column; gap:4px">
+                            @if (row.status === 'submitted' || row.status === 'retained' || row.status === 'rejected') {
+                              <div style="display:flex; gap:2px">
+                                <button mat-icon-button color="primary" (click)="retain(row)"
+                                        matTooltip="Retenir" [disabled]="row.status === 'retained'">
+                                  <mat-icon>check_circle</mat-icon>
+                                </button>
+                                <button mat-icon-button color="warn" (click)="reject(row)"
+                                        matTooltip="Rejeter" [disabled]="row.status === 'rejected'">
+                                  <mat-icon>cancel</mat-icon>
+                                </button>
+                              </div>
+                            }
+                            @if (row.type === 'milestone' && (row.status === 'submitted' || row.status === 'retained')) {
+                              <div style="display:flex; align-items:center; gap:4px">
+                                <input #amtInput
+                                       style="width:90px; font-size:12px; border:1px solid #ccc; border-radius:4px; padding:2px 6px"
+                                       [value]="row.paymentAmountFinal ?? ''"
+                                       placeholder="Montant final" />
+                                <button mat-icon-button (click)="setPaymentFinal(row, amtInput.value)"
+                                        matTooltip="Enregistrer montant final">
+                                  <mat-icon>save</mat-icon>
+                                </button>
+                              </div>
+                            }
+                            @if (auth.isSuperAdmin() && row.status !== 'draft') {
+                              <button mat-stroked-button
+                                      style="font-size:11px; padding:0 6px; height:24px; line-height:24px; min-width:0"
+                                      (click)="unlock(row)"
+                                      matTooltip="Renvoyer en brouillon (SA)">
+                                <mat-icon style="font-size:14px; height:14px; width:14px">lock_open</mat-icon>
+                                Déverrouiller
+                              </button>
+                            }
+                            <button mat-icon-button (click)="downloadSectionDocx(row.referenceSectionId)"
+                                    matTooltip="Exporter cet axe (Word)">
+                              <mat-icon>download</mat-icon>
                             </button>
                           </div>
-                        }
-                        @if (row.type === 'milestone' && (row.status === 'submitted' || row.status === 'retained')) {
-                          <div style="display:flex; align-items:center; gap:4px">
-                            <input #amtInput
-                                   style="width:90px; font-size:12px; border:1px solid #ccc; border-radius:4px; padding:2px 6px"
-                                   [value]="row.paymentAmountFinal ?? ''"
-                                   placeholder="Montant final" />
-                            <button mat-icon-button (click)="setPaymentFinal(row, amtInput.value)"
-                                    matTooltip="Enregistrer montant final">
-                              <mat-icon>save</mat-icon>
-                            </button>
-                          </div>
-                        }
-                        @if (auth.isSuperAdmin() && row.status !== 'draft') {
-                          <button mat-stroked-button
-                                  style="font-size:11px; padding:0 6px; height:24px; line-height:24px; min-width:0"
-                                  (click)="unlock(row)"
-                                  matTooltip="Renvoyer en brouillon (SA)">
-                            <mat-icon style="font-size:14px; height:14px; width:14px">lock_open</mat-icon>
-                            Déverrouiller
-                          </button>
-                        }
-                        <button mat-icon-button (click)="downloadSectionDocx(row.referenceSectionId)"
-                                matTooltip="Exporter cet axe (Word)">
-                          <mat-icon>download</mat-icon>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination -->
+              <mat-paginator
+                [length]="filtered().length"
+                [pageSize]="pageSize()"
+                [pageIndex]="pageIndex()"
+                [pageSizeOptions]="[10, 25, 50, 100]"
+                (page)="onPage($event)"
+                showFirstLastButtons
+                style="border-top:1px solid #e0e0e0">
+              </mat-paginator>
+            </div>
           </div>
 
-          <!-- Pagination -->
-          <mat-paginator
-            [length]="filtered().length"
-            [pageSize]="pageSize()"
-            [pageIndex]="pageIndex()"
-            [pageSizeOptions]="[10, 25, 50, 100]"
-            (page)="onPage($event)"
-            showFirstLastButtons
-            style="border-top:1px solid #e0e0e0">
-          </mat-paginator>
+          <!-- Panneau de détail -->
+          @if (selectedRow()) {
+            <div class="detail-panel">
+
+              <!-- En-tête panneau -->
+              <div class="dp-header">
+                <div style="flex:1; min-width:0">
+                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px">
+                    <span class="section-badge">{{ TYPE_LABELS[selectedRow()!.type] }}</span>
+                    <span [class]="'chip-' + selectedRow()!.status"
+                          style="font-size:11px; padding:2px 8px; border-radius:4px; font-weight:600">
+                      {{ statusLabel(selectedRow()!.status) }}
+                    </span>
+                    <span class="section-badge" style="background:#fff3e0; color:#e65100">
+                      {{ selectedRow()!.entity.code }}
+                    </span>
+                  </div>
+                  <div style="font-size:12px; color:#444; line-height:1.4; margin-bottom:4px">
+                    {{ selectedRow()!.referenceSection?.titre }}
+                  </div>
+                  <div style="font-size:11px; color:#777">
+                    {{ selectedRow()!.author.email }} · {{ selectedRow()!.updatedAt | date:'dd/MM/yyyy HH:mm' }}
+                  </div>
+                </div>
+                <button mat-icon-button (click)="closePanel()" matTooltip="Fermer (Échap)" style="flex-shrink:0">
+                  <mat-icon>close</mat-icon>
+                </button>
+              </div>
+
+              <!-- Corps -->
+              <div class="dp-body">
+
+                @if (selectedRow()!.title) {
+                  <h2 class="dp-title">{{ selectedRow()!.title }}</h2>
+                }
+
+                @if (selectedRow()!.content) {
+                  <div class="dp-block">
+                    <div class="dp-label">Contenu</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.content"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.means) {
+                  <div class="dp-block">
+                    <div class="dp-label">Intrant</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.means"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.output) {
+                  <div class="dp-block">
+                    <div class="dp-label">Extrant</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.output"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.verificationMethod) {
+                  <div class="dp-block">
+                    <div class="dp-label">Méthode de vérification</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.verificationMethod"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.targetValue) {
+                  <div class="dp-block">
+                    <div class="dp-label">Valeur cible</div>
+                    <div class="dp-text">{{ selectedRow()!.targetValue }}</div>
+                  </div>
+                }
+
+                @if (selectedRow()!.baseline) {
+                  <div class="dp-block">
+                    <div class="dp-label">Baseline</div>
+                    <div class="dp-text">{{ selectedRow()!.baseline }}</div>
+                  </div>
+                }
+
+                @if (selectedRow()!.dataSource) {
+                  <div class="dp-block">
+                    <div class="dp-label">Source de données</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.dataSource"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.frequency) {
+                  <div class="dp-block">
+                    <div class="dp-label">Fréquence</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.frequency"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.dueMonth) {
+                  <div class="dp-block">
+                    <div class="dp-label">Échéance</div>
+                    <div class="dp-text">{{ selectedRow()!.dueMonth }}</div>
+                  </div>
+                }
+
+                @if (selectedRow()!.objective) {
+                  <div class="dp-block">
+                    <div class="dp-label">Objectif</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.objective"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.sourceRef) {
+                  <div class="dp-block">
+                    <div class="dp-label">Référence source</div>
+                    <div class="dp-text">{{ selectedRow()!.sourceRef }}</div>
+                  </div>
+                }
+
+                @if (selectedRow()!.deliverable) {
+                  <div class="dp-block">
+                    <div class="dp-label">Livrable</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.deliverable"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.likelihood) {
+                  <div class="dp-block">
+                    <div class="dp-label">Probabilité</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.likelihood"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.impact) {
+                  <div class="dp-block">
+                    <div class="dp-label">Impact</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.impact"></div>
+                  </div>
+                }
+
+                @if (selectedRow()!.mitigation) {
+                  <div class="dp-block">
+                    <div class="dp-label">Plan d'atténuation</div>
+                    <div class="dp-rich" [innerHTML]="selectedRow()!.mitigation"></div>
+                  </div>
+                }
+
+                <!-- Jalon : montants -->
+                @if (selectedRow()!.type === 'milestone') {
+                  <div class="dp-block">
+                    <div class="dp-label">Montant proposé</div>
+                    <div class="dp-text">{{ selectedRow()!.paymentAmountProposed ?? '—' }}</div>
+                  </div>
+                  @if (selectedRow()!.paymentAmountFinal) {
+                    <div class="dp-block">
+                      <div class="dp-label">Montant final validé</div>
+                      <div class="dp-text" style="font-weight:700; color:#1565c0; font-size:16px">
+                        {{ selectedRow()!.paymentAmountFinal }}
+                      </div>
+                    </div>
+                  }
+                  @if ((auth.isSuperAdmin() || auth.isPmo()) &&
+                       (selectedRow()!.status === 'submitted' || selectedRow()!.status === 'retained')) {
+                    <div class="dp-block">
+                      <div class="dp-label">Définir le montant final</div>
+                      <div style="display:flex; gap:8px; align-items:center; margin-top:4px">
+                        <input #panelAmtInput
+                               style="flex:1; font-size:13px; border:1px solid #ccc; border-radius:4px; padding:6px 10px"
+                               [value]="selectedRow()!.paymentAmountFinal ?? ''"
+                               placeholder="Montant final" />
+                        <button mat-stroked-button
+                                (click)="setPaymentFinal(selectedRow()!, panelAmtInput.value)">
+                          <mat-icon>save</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  }
+                }
+
+              </div>
+
+              <!-- Pied : actions PMO -->
+              <div class="dp-footer">
+                @if ((auth.isSuperAdmin() || auth.isPmo()) &&
+                     (selectedRow()!.status === 'submitted' || selectedRow()!.status === 'retained' || selectedRow()!.status === 'rejected')) {
+                  <button mat-raised-button color="primary"
+                          (click)="retain(selectedRow()!)"
+                          [disabled]="selectedRow()!.status === 'retained'">
+                    <mat-icon>check_circle</mat-icon> Retenir
+                  </button>
+                  <button mat-raised-button color="warn"
+                          (click)="reject(selectedRow()!)"
+                          [disabled]="selectedRow()!.status === 'rejected'">
+                    <mat-icon>cancel</mat-icon> Rejeter
+                  </button>
+                }
+                @if (auth.isSuperAdmin() && selectedRow()!.status !== 'draft') {
+                  <button mat-stroked-button (click)="unlock(selectedRow()!)">
+                    <mat-icon>lock_open</mat-icon> Déverrouiller
+                  </button>
+                }
+                <button mat-stroked-button (click)="downloadSectionDocx(selectedRow()!.referenceSectionId)">
+                  <mat-icon>download</mat-icon> Export Word axe
+                </button>
+              </div>
+
+            </div>
+          }
+
         </div>
       }
     </div>
   `,
   styles: [`
+    /* Layout avec panneau */
+    .content-with-panel {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .table-section {
+      flex: 1;
+      min-width: 0;
+    }
+
     /* Tableau natif */
     .cons-table {
       width: 100%;
@@ -311,10 +534,9 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       vertical-align: top;
       word-break: break-word;
       overflow-wrap: break-word;
-      /* pas d'overflow:hidden — le contenu doit s'afficher quand la hauteur de ligne augmente */
     }
 
-    /* Axe : troncature CSS — ellipsis si étroit, texte complet si large */
+    /* Axe : troncature CSS */
     .td-axe {
       position: relative;
       white-space: nowrap;
@@ -328,8 +550,11 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       background: #f5f5f5;
     }
 
+    .row-selected td {
+      background: #e8f0fe !important;
+    }
+
     .td-content {
-      cursor: help;
       white-space: normal;
     }
 
@@ -362,6 +587,90 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       background: rgba(21, 101, 192, 0.18);
       border-bottom: 2px solid #1565c0;
     }
+
+    /* ── Panneau de détail ── */
+    .detail-panel {
+      width: 440px;
+      min-width: 380px;
+      background: white;
+      border-radius: 6px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 80px);
+      position: sticky;
+      top: 16px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .dp-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 14px 16px 12px;
+      border-bottom: 3px solid #1565c0;
+      background: #f0f4ff;
+    }
+
+    .dp-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .dp-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1a237e;
+      margin: 0 0 16px;
+      line-height: 1.5;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e8eaf6;
+    }
+
+    .dp-block {
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #f5f5f5;
+    }
+
+    .dp-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #1565c0;
+      margin-bottom: 5px;
+    }
+
+    .dp-rich {
+      font-size: 14px;
+      line-height: 1.7;
+      color: #222;
+      word-break: break-word;
+    }
+
+    .dp-rich p { margin: 0 0 6px; }
+    .dp-rich p:last-child { margin-bottom: 0; }
+    .dp-rich ul, .dp-rich ol { margin: 4px 0 6px 18px; }
+    .dp-rich li { margin-bottom: 3px; }
+
+    .dp-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #222;
+      word-break: break-word;
+    }
+
+    .dp-footer {
+      padding: 12px 16px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: #fafafa;
+    }
   `],
 })
 export class ConsolidationComponent implements OnInit {
@@ -388,10 +697,10 @@ export class ConsolidationComponent implements OnInit {
   pageIndex = signal(0);
   pageSize = signal(25);
 
-  /** Hauteurs des lignes par id de contribution (undefined = auto) */
   rowHeights = signal<Record<string, number>>({});
 
-  /** Largeurs initiales des colonnes — utilisées pour l'init et après resize */
+  selectedRow = signal<Input | null>(null);
+
   cw = {
     section: signal(140),
     entity: signal(80),
@@ -402,12 +711,14 @@ export class ConsolidationComponent implements OnInit {
   };
 
   constructor() {
-    // Reset page sur changement de filtre
     effect(() => {
       this.filterSection(); this.filterStatus(); this.filterType(); this.filterEntity();
       untracked(() => this.pageIndex.set(0));
     });
   }
+
+  @HostListener('document:keydown.escape')
+  onEsc() { this.selectedRow.set(null); }
 
   entityCodes = computed(() => {
     const codes = new Set(this.allInputs().map(i => i.entity.code));
@@ -459,7 +770,11 @@ export class ConsolidationComponent implements OnInit {
     this.pageSize.set(e.pageSize);
   }
 
-  // ── Resize colonnes — manipulation directe du DOM hors zone Angular ─────────
+  selectRow(row: Input) { this.selectedRow.set(row); }
+
+  closePanel() { this.selectedRow.set(null); }
+
+  // ── Resize colonnes ─────────────────────────────────────────────────────────
 
   startResize(event: MouseEvent, col: ColKey) {
     event.preventDefault();
@@ -470,7 +785,6 @@ export class ConsolidationComponent implements OnInit {
     const colEl = wrapper.querySelectorAll<HTMLElement>('colgroup col')[colIndex];
     if (!colEl) return;
 
-    // Lire la largeur depuis le <th> (offsetWidth fiable) — les <col> n'ont pas de layout box
     const th = wrapper.querySelectorAll<HTMLElement>('thead th')[colIndex];
     const startX = event.pageX;
     const startW = th?.offsetWidth ?? this.cw[col]();
@@ -478,7 +792,6 @@ export class ConsolidationComponent implements OnInit {
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'col-resize';
 
-    // Tout hors zone Angular : DOM pur, 60fps, aucun re-render pendant le drag
     this.zone.runOutsideAngular(() => {
       const onMove = (e: MouseEvent) => {
         colEl.style.width = `${Math.max(60, startW + e.pageX - startX)}px`;
@@ -490,7 +803,6 @@ export class ConsolidationComponent implements OnInit {
         document.body.style.cursor = '';
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        // Réintégrer la zone Angular pour synchroniser le signal (déclenche CD)
         this.zone.run(() => this.cw[col].set(newW));
       };
 
@@ -533,7 +845,7 @@ export class ConsolidationComponent implements OnInit {
     });
   }
 
-  // ── Exports via HttpClient (interceptor → Authorization header) ─────────────
+  // ── Exports ──────────────────────────────────────────────────────────────────
 
   downloadGlobalDocx() {
     this.downloading.set(true);
@@ -569,7 +881,7 @@ export class ConsolidationComponent implements OnInit {
     URL.revokeObjectURL(url);
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   statusLabel(status: InputStatus): string {
     const labels: Record<InputStatus, string> = {
@@ -579,25 +891,6 @@ export class ConsolidationComponent implements OnInit {
   }
 
   preview(html: string): string { return htmlToText(html, 120); }
-
-  tooltipText(row: any): string {
-    const t = (v: string) => htmlToText(v, 99999);
-    const parts: string[] = [];
-    if (row.title) parts.push(`[Titre] ${row.title}`);
-    if (row.content) parts.push(t(row.content));
-    if (row.means) parts.push(`Intrant : ${t(row.means)}`);
-    if (row.output) parts.push(`Extrant : ${t(row.output)}`);
-    if (row.verificationMethod) parts.push(`Vérification : ${t(row.verificationMethod)}`);
-    if (row.targetValue) parts.push(`Valeur cible : ${t(row.targetValue)}`);
-    if (row.dueMonth) parts.push(`Échéance : ${row.dueMonth}`);
-    if (row.likelihood) parts.push(`Probabilité : ${t(row.likelihood)}`);
-    if (row.impact) parts.push(`Impact : ${t(row.impact)}`);
-    if (row.mitigation) parts.push(`Atténuation : ${t(row.mitigation)}`);
-    if (row.objective) parts.push(`Objectif : ${t(row.objective)}`);
-    if (row.dataSource) parts.push(`Source : ${t(row.dataSource)}`);
-    if (row.frequency) parts.push(`Fréquence : ${t(row.frequency)}`);
-    return parts.join('\n');
-  }
 
   retain(input: Input) {
     this.inputsService.updatePmo(input.id, { status: 'retained' }).subscribe({
@@ -630,5 +923,8 @@ export class ConsolidationComponent implements OnInit {
 
   private updateLocal(updated: Input) {
     this.allInputs.update(list => list.map(i => i.id === updated.id ? updated : i));
+    if (this.selectedRow()?.id === updated.id) {
+      this.selectedRow.set(updated);
+    }
   }
 }
