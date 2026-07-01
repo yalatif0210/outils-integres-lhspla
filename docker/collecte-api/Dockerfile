@@ -10,6 +10,7 @@ WORKDIR /app
 COPY collecte-api/package*.json ./
 COPY collecte-api/prisma ./prisma
 RUN npm install --legacy-peer-deps
+RUN npx prisma generate
 
 COPY collecte-api/ .
 RUN npm run build
