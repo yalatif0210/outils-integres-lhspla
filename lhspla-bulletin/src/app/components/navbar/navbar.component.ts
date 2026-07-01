@@ -85,6 +85,10 @@ import { ENTITIES } from '../../models/bulletin.models';
           <mat-icon>inventory_2</mat-icon> Stock <mat-icon class="arrow">arrow_drop_down</mat-icon>
         </button>
 
+        <a mat-button href="/collecte/" matTooltip="Module Collecte des inputs GHSD">
+          <mat-icon>assignment</mat-icon> Collecte GHSD
+        </a>
+
         <button mat-button [matMenuTriggerFor]="adminMenu" *ngIf="auth.isAdmin()">
           <mat-icon>admin_panel_settings</mat-icon> Admin <mat-icon class="arrow">arrow_drop_down</mat-icon>
         </button>
@@ -308,6 +312,9 @@ import { ENTITIES } from '../../models/bulletin.models';
         </a>
         <a class="drawer-link" routerLink="/brief" routerLinkActive="drawer-active" (click)="closeMenu()">
           <mat-icon>newspaper</mat-icon> Weekly Operations Brief
+        </a>
+        <a class="drawer-link" href="/collecte/" (click)="closeMenu()">
+          <mat-icon>assignment</mat-icon> Collecte GHSD
         </a>
       </div>
 
