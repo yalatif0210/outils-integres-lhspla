@@ -8,6 +8,6 @@ export const authGuard: CanActivateFn = () => {
   if (auth.isLoggedIn()) return true;
 
   // Redirige vers l'app principale pour se connecter, puis revient ici
-  window.location.href = `${environment.mainAppUrl}/login?returnUrl=${encodeURIComponent(window.location.href)}`;
+  window.location.href = `/login?returnUrl=${encodeURIComponent(window.location.href)}`;
   return false;
 };

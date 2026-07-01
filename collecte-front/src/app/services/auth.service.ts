@@ -44,6 +44,6 @@ export class AuthService {
   }
 
   logout(): void {
-    window.location.href = environment.mainAppUrl || '/';
+    window.location.href = environment.mainAppUrl;
   }
 }

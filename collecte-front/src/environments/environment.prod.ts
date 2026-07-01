@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
   apiUrl: '/collecte-api/api/v1',
-  mainAppUrl: '',
+  mainAppUrl: '/',
   mainApiUrl: '/api',
   authMode: 'sso',
   localStorageTokenKey: 'lhspla_access_token',
