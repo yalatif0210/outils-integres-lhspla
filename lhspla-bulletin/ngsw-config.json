@@ -37,6 +37,14 @@
       }
     }
   ],
+  "navigationUrls": [
+    "/**",
+    "!/**/*.*",
+    "!/**/*__*",
+    "!/**/*__*/**",
+    "!/collecte/**",
+    "!/collecte-api/**"
+  ],
   "dataGroups": [
     {
       "name": "api-auth",
