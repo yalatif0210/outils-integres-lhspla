@@ -1,4 +1,6 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import {
+  Component, inject, signal, OnInit, computed, effect, untracked, ElementRef, ViewChild,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -12,10 +14,9 @@ import { MatTableModule } from '@angular/material/table';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { InputsService, Input, InputStatus } from '../../services/inputs.service';
 import { SectionsService } from '../../services/sections.service';
 import { AuthService } from '../../services/auth.service';
@@ -26,6 +27,8 @@ const TYPE_LABELS: Record<string, string> = {
   milestone: 'Jalon', comment: 'Commentaire', risk: 'Risque',
 };
 
+type ColKey = 'section' | 'entity' | 'type' | 'content' | 'status' | 'actions';
+
 @Component({
   selector: 'app-consolidation',
   standalone: true,
@@ -33,30 +36,31 @@ const TYPE_LABELS: Record<string, string> = {
     CommonModule, FormsModule, RouterLink,
     MatCardModule, MatButtonModule, MatIconModule, MatSelectModule,
     MatFormFieldModule, MatInputModule, MatTableModule, MatChipsModule,
-    MatProgressSpinnerModule, MatSnackBarModule, MatDialogModule,
-    MatExpansionModule, MatTooltipModule, MatDividerModule,
+    MatProgressSpinnerModule, MatSnackBarModule, MatTooltipModule,
+    MatDividerModule, MatPaginatorModule,
   ],
   template: `
     <div class="page-container">
 
+      <!-- En-tête -->
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px">
         <div>
           <h1 style="margin:0; font-size:22px; font-weight:600">Consolidation PMO</h1>
           <p style="margin:4px 0 0; color:#666; font-size:14px">Revue et qualification des contributions</p>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
           @if (auth.isSuperAdmin()) {
             <a mat-stroked-button routerLink="/trash" style="color:#c62828">
               <mat-icon>delete_sweep</mat-icon> Corbeille (SA)
             </a>
           }
           @if (auth.isSuperAdmin() || auth.isPmo()) {
-            <a mat-stroked-button [href]="exportDocxUrl" target="_blank">
+            <button mat-stroked-button (click)="downloadGlobalDocx()" [disabled]="downloading()">
               <mat-icon>description</mat-icon> Export Word global
-            </a>
-            <a mat-stroked-button [href]="exportXlsxUrl" target="_blank">
+            </button>
+            <button mat-stroked-button (click)="downloadGlobalXlsx()" [disabled]="downloading()">
               <mat-icon>table_chart</mat-icon> Export Excel global
-            </a>
+            </button>
           }
         </div>
       </div>
@@ -129,109 +133,147 @@ const TYPE_LABELS: Record<string, string> = {
       }
 
       @if (!loading()) {
-        <mat-table [dataSource]="filtered()" style="width:100%; background:white; border-radius:4px">
+        <!-- Tableau avec colonnes redimensionnables -->
+        <div #tableWrapper style="overflow-x:auto; border-radius:4px; box-shadow:0 2px 4px rgba(0,0,0,.12)">
+          <mat-table [dataSource]="paginated()"
+            style="background:white; border-radius:4px;"
+            [style.--col-section-w]="cw.section() + 'px'"
+            [style.--col-entity-w]="cw.entity() + 'px'"
+            [style.--col-type-w]="cw.type() + 'px'"
+            [style.--col-content-w]="cw.content() + 'px'"
+            [style.--col-status-w]="cw.status() + 'px'"
+            [style.--col-actions-w]="cw.actions() + 'px'">
 
-          <ng-container matColumnDef="section">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:130px">Axe</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="font-size:12px; color:#555; min-width:130px; word-break:break-word; white-space:normal; padding:6px 8px"
-                      [matTooltip]="row.referenceSection?.titre" matTooltipShowDelay="400">
-              {{ row.referenceSection?.titre | slice:0:35 }}...
-            </mat-cell>
-          </ng-container>
+            <!-- Axe -->
+            <ng-container matColumnDef="section">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-section-w,140px)">
+                <span>Axe</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'section')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row" style="--col-w:var(--col-section-w,140px); word-break:break-word; white-space:normal; padding:6px 8px; font-size:12px; color:#555"
+                        [matTooltip]="row.referenceSection?.titre" matTooltipShowDelay="400">
+                {{ row.referenceSection?.titre | slice:0:35 }}...
+              </mat-cell>
+            </ng-container>
 
-          <ng-container matColumnDef="entity">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:70px">Entité</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="min-width:70px">
-              <span class="section-badge">{{ row.entity.code }}</span>
-            </mat-cell>
-          </ng-container>
+            <!-- Entité -->
+            <ng-container matColumnDef="entity">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-entity-w,80px)">
+                <span>Entité</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'entity')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row" style="--col-w:var(--col-entity-w,80px)">
+                <span class="section-badge">{{ row.entity.code }}</span>
+              </mat-cell>
+            </ng-container>
 
-          <ng-container matColumnDef="type">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:90px">Type</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="font-size:13px; min-width:90px">{{ TYPE_LABELS[row.type] }}</mat-cell>
-          </ng-container>
+            <!-- Type -->
+            <ng-container matColumnDef="type">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-type-w,100px)">
+                <span>Type</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'type')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row" style="--col-w:var(--col-type-w,100px); font-size:13px">
+                {{ TYPE_LABELS[row.type] }}
+              </mat-cell>
+            </ng-container>
 
-          <ng-container matColumnDef="content">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700">Contribution</mat-header-cell>
-            <mat-cell *matCellDef="let row"
-                      style="flex-direction:column; align-items:start; padding:8px; cursor:pointer; word-break:break-word; white-space:normal; max-width:420px"
-                      [matTooltip]="tooltipText(row)"
-                      matTooltipClass="multiline-tooltip"
-                      matTooltipShowDelay="300"
-                      matTooltipPosition="left">
-              @if (row.title) {
-                <div style="font-weight:700; font-size:13px; margin-bottom:2px">{{ row.title }}</div>
-              }
-              @if (row.content) {
-                <div class="rich-content" style="color:#444; font-size:12px" [innerHTML]="preview(row.content)"></div>
-              }
-              @if (row.type === 'milestone' && row.paymentAmountProposed) {
-                <div style="font-size:11px; color:#666; margin-top:2px">
-                  Proposé : {{ row.paymentAmountProposed }}
-                  @if (row.paymentAmountFinal) { <span> → Final : <strong>{{ row.paymentAmountFinal }}</strong></span> }
+            <!-- Contribution -->
+            <ng-container matColumnDef="content">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-content-w,380px)">
+                <span>Contribution</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'content')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row"
+                        style="--col-w:var(--col-content-w,380px); flex-direction:column; align-items:start; padding:8px; word-break:break-word; white-space:normal; cursor:help"
+                        [matTooltip]="tooltipText(row)"
+                        matTooltipClass="multiline-tooltip"
+                        matTooltipShowDelay="300"
+                        matTooltipPosition="left">
+                @if (row.title) {
+                  <div style="font-weight:700; font-size:13px; margin-bottom:2px">{{ row.title }}</div>
+                }
+                @if (row.content) {
+                  <div class="rich-content" style="color:#444; font-size:12px" [innerHTML]="preview(row.content)"></div>
+                }
+                @if (row.type === 'milestone' && row.paymentAmountProposed) {
+                  <div style="font-size:11px; color:#666; margin-top:2px">
+                    Proposé : {{ row.paymentAmountProposed }}
+                    @if (row.paymentAmountFinal) {
+                      <span> → Final : <strong>{{ row.paymentAmountFinal }}</strong></span>
+                    }
+                  </div>
+                }
+                <div style="font-size:11px; color:#888; margin-top:4px">
+                  {{ row.author.email }} · {{ row.updatedAt | date:'dd/MM/yyyy HH:mm' }}
                 </div>
-              }
-              <div style="font-size:11px; color:#888; margin-top:4px">
-                {{ row.author.email }} · {{ row.updatedAt | date:'dd/MM/yyyy HH:mm' }}
-              </div>
-            </mat-cell>
-          </ng-container>
+              </mat-cell>
+            </ng-container>
 
-          <ng-container matColumnDef="status">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:90px">Statut</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="min-width:90px">
-              <span [class]="'chip-' + row.status"
-                    style="padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600">
-                {{ statusLabel(row.status) }}
-              </span>
-            </mat-cell>
-          </ng-container>
+            <!-- Statut -->
+            <ng-container matColumnDef="status">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-status-w,90px)">
+                <span>Statut</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'status')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row" style="--col-w:var(--col-status-w,90px)">
+                <span [class]="'chip-' + row.status"
+                      style="padding:3px 8px; border-radius:4px; font-size:12px; font-weight:600; white-space:nowrap">
+                  {{ statusLabel(row.status) }}
+                </span>
+              </mat-cell>
+            </ng-container>
 
-          <ng-container matColumnDef="actions">
-            <mat-header-cell *matHeaderCellDef style="font-weight:700; min-width:160px">Actions PMO</mat-header-cell>
-            <mat-cell *matCellDef="let row" style="min-width:160px">
-              <div style="display:flex; flex-direction:column; gap:4px; padding:4px 0">
-                @if (row.status === 'submitted' || row.status === 'retained' || row.status === 'rejected') {
-                  <div style="display:flex; gap:4px">
-                    <button mat-icon-button color="primary" (click)="retain(row)"
-                            matTooltip="Retenir" [disabled]="row.status === 'retained'">
-                      <mat-icon>check_circle</mat-icon>
+            <!-- Actions -->
+            <ng-container matColumnDef="actions">
+              <mat-header-cell *matHeaderCellDef class="resizable-header" style="--col-w:var(--col-actions-w,180px)">
+                <span>Actions PMO</span>
+                <div class="col-resize-handle" (mousedown)="startResize($event, 'actions')"></div>
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row" style="--col-w:var(--col-actions-w,180px)">
+                <div style="display:flex; flex-direction:column; gap:4px; padding:4px 0">
+                  @if (row.status === 'submitted' || row.status === 'retained' || row.status === 'rejected') {
+                    <div style="display:flex; gap:4px">
+                      <button mat-icon-button color="primary" (click)="retain(row)"
+                              matTooltip="Retenir" [disabled]="row.status === 'retained'">
+                        <mat-icon>check_circle</mat-icon>
+                      </button>
+                      <button mat-icon-button color="warn" (click)="reject(row)"
+                              matTooltip="Rejeter" [disabled]="row.status === 'rejected'">
+                        <mat-icon>cancel</mat-icon>
+                      </button>
+                    </div>
+                  }
+                  @if (row.type === 'milestone' && (row.status === 'submitted' || row.status === 'retained')) {
+                    <div style="display:flex; align-items:center; gap:4px">
+                      <input #amtInput style="width:90px; font-size:12px; border:1px solid #ccc; border-radius:4px; padding:2px 6px"
+                             [value]="row.paymentAmountFinal ?? ''"
+                             placeholder="Montant final" />
+                      <button mat-icon-button (click)="setPaymentFinal(row, amtInput.value)"
+                              matTooltip="Enregistrer montant final">
+                        <mat-icon>save</mat-icon>
+                      </button>
+                    </div>
+                  }
+                  @if (auth.isSuperAdmin() && row.status !== 'draft') {
+                    <button mat-stroked-button style="font-size:11px; padding:0 6px; height:24px; line-height:24px"
+                            (click)="unlock(row)"
+                            matTooltip="Renvoyer en brouillon (Super Admin)">
+                      <mat-icon style="font-size:14px">lock_open</mat-icon> Déverrouiller
                     </button>
-                    <button mat-icon-button color="warn" (click)="reject(row)"
-                            matTooltip="Rejeter" [disabled]="row.status === 'rejected'">
-                      <mat-icon>cancel</mat-icon>
-                    </button>
-                  </div>
-                }
-                @if (row.type === 'milestone' && (row.status === 'submitted' || row.status === 'retained')) {
-                  <div style="display:flex; align-items:center; gap:4px">
-                    <input #amtInput style="width:100px; font-size:12px; border:1px solid #ccc; border-radius:4px; padding:2px 6px"
-                           [value]="row.paymentAmountFinal ?? ''"
-                           placeholder="Montant final" />
-                    <button mat-icon-button (click)="setPaymentFinal(row, amtInput.value)"
-                            matTooltip="Enregistrer montant final">
-                      <mat-icon>save</mat-icon>
-                    </button>
-                  </div>
-                }
-                @if (auth.isSuperAdmin() && row.status !== 'draft') {
-                  <button mat-stroked-button style="font-size:11px; padding:0 6px; height:24px; line-height:24px"
-                          (click)="unlock(row)"
-                          matTooltip="Renvoyer en brouillon (Super Admin)">
-                    <mat-icon style="font-size:14px">lock_open</mat-icon> Déverrouiller
+                  }
+                  <button mat-icon-button (click)="downloadSectionDocx(row.referenceSectionId)"
+                          matTooltip="Exporter cet axe (Word)">
+                    <mat-icon>download</mat-icon>
                   </button>
-                }
-                <a mat-icon-button [href]="exportDocxForSection(row.referenceSectionId)"
-                   target="_blank" matTooltip="Exporter cet axe (Word)">
-                  <mat-icon>download</mat-icon>
-                </a>
-              </div>
-            </mat-cell>
-          </ng-container>
+                </div>
+              </mat-cell>
+            </ng-container>
 
-          <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
-          <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
-        </mat-table>
+            <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+            <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+          </mat-table>
+        </div>
 
         @if (filtered().length === 0) {
           <div style="text-align:center; padding:40px; color:#999">
@@ -239,6 +281,16 @@ const TYPE_LABELS: Record<string, string> = {
             Aucun input avec ces filtres
           </div>
         }
+
+        <mat-paginator
+          [length]="filtered().length"
+          [pageSize]="pageSize()"
+          [pageIndex]="pageIndex()"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          (page)="onPage($event)"
+          showFirstLastButtons
+          style="background:white; border-top:1px solid #e0e0e0; border-radius:0 0 4px 4px">
+        </mat-paginator>
       }
     </div>
   `,
@@ -249,6 +301,37 @@ const TYPE_LABELS: Record<string, string> = {
       font-size: 12px !important;
       line-height: 1.5 !important;
     }
+
+    .resizable-header {
+      flex: 0 0 var(--col-w) !important;
+      min-width: var(--col-w) !important;
+      max-width: var(--col-w) !important;
+      position: relative;
+      overflow: visible !important;
+      padding-right: 14px !important;
+      user-select: none;
+    }
+
+    mat-cell {
+      flex: 0 0 var(--col-w) !important;
+      min-width: var(--col-w) !important;
+      max-width: var(--col-w) !important;
+      overflow: hidden;
+    }
+
+    .col-resize-handle {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 6px;
+      cursor: col-resize;
+      z-index: 2;
+    }
+    .col-resize-handle:hover, .col-resize-handle:active {
+      background: rgba(21, 101, 192, 0.22);
+      border-right: 2px solid #1565c0;
+    }
   `],
 })
 export class ConsolidationComponent implements OnInit {
@@ -257,24 +340,41 @@ export class ConsolidationComponent implements OnInit {
   private snackBar = inject(MatSnackBar);
   auth = inject(AuthService);
 
+  @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
+
   readonly TYPE_LABELS = TYPE_LABELS;
 
   allInputs = signal<Input[]>([]);
   sections = signal<any[]>([]);
   loading = signal(true);
+  downloading = signal(false);
 
   filterSection = signal('');
   filterStatus = signal('');
   filterType = signal('');
   filterEntity = signal('');
 
-  displayedColumns = ['section', 'entity', 'type', 'content', 'status', 'actions'];
+  pageIndex = signal(0);
+  pageSize = signal(25);
 
-  exportDocxUrl = this.inputsService.exportDocx();
-  exportXlsxUrl = this.inputsService.exportXlsx();
+  /** Largeurs de colonnes — CSS variables mises à jour en temps réel via le DOM */
+  cw = {
+    section: signal(140),
+    entity: signal(80),
+    type: signal(100),
+    content: signal(380),
+    status: signal(90),
+    actions: signal(180),
+  };
 
-  exportDocxForSection(sectionId: string) {
-    return this.inputsService.exportDocx(sectionId);
+  displayedColumns: string[] = ['section', 'entity', 'type', 'content', 'status', 'actions'];
+
+  constructor() {
+    // Reset page sur changement de filtre
+    effect(() => {
+      this.filterSection(); this.filterStatus(); this.filterType(); this.filterEntity();
+      untracked(() => this.pageIndex.set(0));
+    });
   }
 
   entityCodes = computed(() => {
@@ -294,6 +394,11 @@ export class ConsolidationComponent implements OnInit {
       if (ent && i.entity.code !== ent) return false;
       return true;
     });
+  });
+
+  paginated = computed(() => {
+    const start = this.pageIndex() * this.pageSize();
+    return this.filtered().slice(start, start + this.pageSize());
   });
 
   entityStats = computed(() => {
@@ -316,6 +421,89 @@ export class ConsolidationComponent implements OnInit {
       error: () => this.loading.set(false),
     });
   }
+
+  onPage(e: PageEvent) {
+    this.pageIndex.set(e.pageIndex);
+    this.pageSize.set(e.pageSize);
+  }
+
+  // ── Resize colonnes ────────────────────────────────────────────────────────
+
+  startResize(event: MouseEvent, col: ColKey) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.pageX;
+    const startW = this.cw[col]();
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    const onMove = (e: MouseEvent) => {
+      const newW = Math.max(60, startW + e.pageX - startX);
+      this.cw[col].set(newW);
+    };
+
+    const onUp = () => {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  // ── Exports (via HttpClient → interceptor → Authorization header) ──────────
+
+  downloadGlobalDocx() {
+    this.downloading.set(true);
+    this.inputsService.downloadDocx().subscribe({
+      next: (blob) => {
+        this.triggerDownload(blob, `collecte-global-${Date.now()}.docx`);
+        this.downloading.set(false);
+      },
+      error: (e) => {
+        this.snackBar.open(e.error?.message ?? 'Erreur export', 'Fermer', { duration: 4000 });
+        this.downloading.set(false);
+      },
+    });
+  }
+
+  downloadGlobalXlsx() {
+    this.downloading.set(true);
+    this.inputsService.downloadXlsx().subscribe({
+      next: (blob) => {
+        this.triggerDownload(blob, `collecte-global-${Date.now()}.xlsx`);
+        this.downloading.set(false);
+      },
+      error: (e) => {
+        this.snackBar.open(e.error?.message ?? 'Erreur export', 'Fermer', { duration: 4000 });
+        this.downloading.set(false);
+      },
+    });
+  }
+
+  downloadSectionDocx(sectionId: string) {
+    this.inputsService.downloadDocx(sectionId).subscribe({
+      next: (blob) => this.triggerDownload(blob, `collecte-${sectionId}-${Date.now()}.docx`),
+      error: (e) => this.snackBar.open(e.error?.message ?? 'Erreur export', 'Fermer', { duration: 4000 }),
+    });
+  }
+
+  private triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
 
   statusLabel(status: InputStatus): string {
     const labels: Record<InputStatus, string> = {

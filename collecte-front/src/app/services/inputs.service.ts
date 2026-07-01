@@ -121,13 +121,17 @@ export class InputsService {
     return this.http.delete(`${this.base}/${id}`);
   }
 
-  exportDocx(sectionId?: string): string {
-    if (sectionId) return `${environment.apiUrl}/export/section/${sectionId}/docx`;
-    return `${environment.apiUrl}/export/global/docx`;
+  downloadDocx(sectionId?: string) {
+    const url = sectionId
+      ? `${environment.apiUrl}/export/section/${sectionId}/docx`
+      : `${environment.apiUrl}/export/global/docx`;
+    return this.http.get(url, { responseType: 'blob' });
   }
 
-  exportXlsx(sectionId?: string): string {
-    if (sectionId) return `${environment.apiUrl}/export/section/${sectionId}/xlsx`;
-    return `${environment.apiUrl}/export/global/xlsx`;
+  downloadXlsx(sectionId?: string) {
+    const url = sectionId
+      ? `${environment.apiUrl}/export/section/${sectionId}/xlsx`
+      : `${environment.apiUrl}/export/global/xlsx`;
+    return this.http.get(url, { responseType: 'blob' });
   }
 }
