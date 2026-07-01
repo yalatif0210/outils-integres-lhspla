@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export enum InputType {
   activity = 'activity',
@@ -10,20 +10,20 @@ export enum InputType {
 
 export class CreateInputDto {
   @IsString()
-  @IsNotEmpty()
   referenceSectionId: string;
 
   @IsEnum(InputType)
   type: InputType;
 
   @IsString()
-  @IsNotEmpty()
-  content: string;
+  @IsOptional()
+  content?: string;
 
   @IsString()
   @IsOptional()
   title?: string;
 
+  // activite + generic
   @IsString()
   @IsOptional()
   means?: string;
@@ -34,13 +34,61 @@ export class CreateInputDto {
 
   @IsString()
   @IsOptional()
+  objective?: string;
+
+  @IsString()
+  @IsOptional()
+  sourceRef?: string;
+
+  // jalon
+  @IsString()
+  @IsOptional()
+  deliverable?: string;
+
+  @IsString()
+  @IsOptional()
   verificationMethod?: string;
 
+  @IsString()
+  @IsOptional()
+  dueMonth?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentAmountProposed?: string;
+
+  // indicateur
   @IsString()
   @IsOptional()
   targetValue?: string;
 
   @IsString()
   @IsOptional()
-  dueMonth?: string;
+  baseline?: string;
+
+  @IsString()
+  @IsOptional()
+  dataSource?: string;
+
+  @IsString()
+  @IsOptional()
+  frequency?: string;
+
+  // risque
+  @IsString()
+  @IsOptional()
+  likelihood?: string;
+
+  @IsString()
+  @IsOptional()
+  impact?: string;
+
+  @IsString()
+  @IsOptional()
+  mitigation?: string;
+
+  // commentaire
+  @IsString()
+  @IsOptional()
+  targetRef?: string;
 }

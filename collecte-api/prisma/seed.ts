@@ -24,6 +24,27 @@ function normalizeEntityCode(code: string): string {
   return code === 'S&E' ? 'SE' : code;
 }
 
+const INPUT_TYPES_BY_SECTION: Record<string, string[]> = {
+  'proposal-summary':       [],
+  'introduction-organisation': [],
+  'problem-statement':      ['comment'],
+  'objectif-1':             ['comment'],
+  'objectif-2':             ['comment'],
+  'objectif-3':             ['comment'],
+  'objectif-4':             ['comment'],
+  'activites-5-1':          ['activity', 'comment'],
+  'activites-5-2':          ['activity', 'comment'],
+  'activites-5-3':          ['activity', 'comment'],
+  'activites-5-4':          ['activity', 'comment'],
+  'activites-5-5':          ['activity', 'comment'],
+  'methods-design':         ['comment'],
+  'milestone-plan':         ['milestone', 'comment'],
+  'monitoring-evaluation':  ['indicator', 'comment'],
+  'sustainability':         ['comment'],
+  'project-partners':       ['comment'],
+  'risk-security':          ['risk', 'comment'],
+};
+
 const SECTIONS = [
   {
     id: 'proposal-summary',
@@ -332,7 +353,8 @@ async function main() {
   console.log('Seeding reference sections...');
   for (const s of SECTIONS) {
     const entites = s.entites.map(normalizeEntityCode);
-    await prisma.referenceSection.upsert({
+    const inputTypes = INPUT_TYPES_BY_SECTION[s.id] ?? [];
+    await (prisma.referenceSection as any).upsert({
       where: { id: s.id },
       update: {
         titre: s.titre,
@@ -341,6 +363,7 @@ async function main() {
         entites,
         ordre: s.ordre,
         contributionMode: s.contributionMode,
+        inputTypes,
         texteReference: s.texteReference,
       },
       create: {
@@ -351,6 +374,7 @@ async function main() {
         entites,
         ordre: s.ordre,
         contributionMode: s.contributionMode,
+        inputTypes,
         texteReference: s.texteReference,
       },
     });

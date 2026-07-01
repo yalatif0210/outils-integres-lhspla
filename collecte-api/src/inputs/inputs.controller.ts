@@ -1,11 +1,11 @@
 import {
   Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards, Request,
+  Param, Body, Query, UseGuards, Request, ForbiddenException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InputsService } from './inputs.service';
 import { CreateInputDto } from './dto/create-input.dto';
-import { UpdateInputDto, UpdateStatusDto } from './dto/update-input.dto';
+import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto } from './dto/update-input.dto';
 
 @Controller('inputs')
 @UseGuards(JwtAuthGuard)
@@ -20,6 +20,24 @@ export class InputsController {
     @Query('status') status?: string,
   ) {
     return this.inputsService.findAll({ sectionId, entityId, type, status });
+  }
+
+  @Get('mine')
+  findMine(
+    @Request() req: any,
+    @Query('sectionId') sectionId?: string,
+    @Query('status') status?: string,
+    @Query('entityCode') entityCode?: string,
+  ) {
+    return this.inputsService.findMine(req.user.userId, { sectionId, status, entityCode });
+  }
+
+  @Get('trash')
+  findTrashed(@Request() req: any) {
+    if (!req.user.roles?.includes('super_admin')) {
+      throw new ForbiddenException('Réservé au Super Admin.');
+    }
+    return this.inputsService.findTrashed();
   }
 
   @Get('stats')
@@ -45,6 +63,16 @@ export class InputsController {
   @Patch(':id/status')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto, @Request() req: any) {
     return this.inputsService.updateStatus(id, dto, req.user);
+  }
+
+  @Patch(':id/pmo')
+  updatePmo(@Param('id') id: string, @Body() dto: UpdatePmoDto, @Request() req: any) {
+    return this.inputsService.updatePmo(id, dto, req.user);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id') id: string, @Request() req: any) {
+    return this.inputsService.restore(id, req.user);
   }
 
   @Delete(':id')

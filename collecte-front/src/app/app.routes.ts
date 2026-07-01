@@ -23,5 +23,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./pages/consolidation/consolidation.component').then(m => m.ConsolidationComponent),
   },
+  {
+    path: 'mes-contributions',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/mes-contributions/mes-contributions.component').then(m => m.MesContributionsComponent),
+  },
+  {
+    path: 'trash',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/trash/trash.component').then(m => m.TrashComponent),
+  },
   { path: '**', redirectTo: 'reference' },
 ];

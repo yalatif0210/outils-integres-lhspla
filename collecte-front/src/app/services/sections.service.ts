@@ -10,6 +10,7 @@ export interface ReferenceSection {
   entites: string[];
   ordre: number;
   contributionMode: 'structuree' | 'commentaire' | 'lecture_seule';
+  inputTypes: string[];
   texteReference: string;
   _count?: { inputs: number };
   inputs?: any[];

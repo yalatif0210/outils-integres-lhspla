@@ -23,6 +23,9 @@ import { environment } from '../environments/environment';
       <a mat-button routerLink="/contribute" routerLinkActive="active-nav">
         <mat-icon>edit_note</mat-icon> Contribuer
       </a>
+      <a mat-button routerLink="/mes-contributions" routerLinkActive="active-nav">
+        <mat-icon>list_alt</mat-icon> Mes contributions
+      </a>
       <a mat-button routerLink="/consolidation" routerLinkActive="active-nav">
         <mat-icon>dashboard</mat-icon> Consolidation
       </a>

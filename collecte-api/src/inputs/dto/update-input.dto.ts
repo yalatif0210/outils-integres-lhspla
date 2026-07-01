@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
 import { InputType } from './create-input.dto';
 
 export enum InputStatus {
@@ -31,7 +31,27 @@ export class UpdateInputDto {
 
   @IsString()
   @IsOptional()
+  objective?: string;
+
+  @IsString()
+  @IsOptional()
+  sourceRef?: string;
+
+  @IsString()
+  @IsOptional()
+  deliverable?: string;
+
+  @IsString()
+  @IsOptional()
   verificationMethod?: string;
+
+  @IsString()
+  @IsOptional()
+  dueMonth?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentAmountProposed?: string;
 
   @IsString()
   @IsOptional()
@@ -39,10 +59,44 @@ export class UpdateInputDto {
 
   @IsString()
   @IsOptional()
-  dueMonth?: string;
+  baseline?: string;
+
+  @IsString()
+  @IsOptional()
+  dataSource?: string;
+
+  @IsString()
+  @IsOptional()
+  frequency?: string;
+
+  @IsString()
+  @IsOptional()
+  likelihood?: string;
+
+  @IsString()
+  @IsOptional()
+  impact?: string;
+
+  @IsString()
+  @IsOptional()
+  mitigation?: string;
+
+  @IsString()
+  @IsOptional()
+  targetRef?: string;
 }
 
 export class UpdateStatusDto {
   @IsEnum(InputStatus)
   status: InputStatus;
+}
+
+export class UpdatePmoDto {
+  @IsIn(['retained', 'rejected'])
+  @IsOptional()
+  status?: 'retained' | 'rejected';
+
+  @IsString()
+  @IsOptional()
+  paymentAmountFinal?: string;
 }

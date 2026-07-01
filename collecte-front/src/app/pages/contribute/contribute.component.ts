@@ -1,7 +1,10 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import {
+  Component, inject, signal, OnInit, OnDestroy, computed,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Subject, Subscription, debounceTime, takeUntil, distinctUntilChanged } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -13,11 +16,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { QuillEditorComponent } from 'ngx-quill';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
 import { InputsService, Input, InputType, InputStatus } from '../../services/inputs.service';
 import { AuthService } from '../../services/auth.service';
-import { MarkdownPipe, htmlToText } from '../../pipes/markdown.pipe';
+import { MarkdownPipe } from '../../pipes/markdown.pipe';
 
 const TYPE_LABELS: Record<InputType, string> = {
   activity: 'Activité',
@@ -50,19 +54,22 @@ const QUILL_MODULES = {
     CommonModule, RouterLink, ReactiveFormsModule, MarkdownPipe, QuillEditorComponent,
     MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatChipsModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatDividerModule, MatListModule,
+    MatSnackBarModule, MatDividerModule, MatListModule, MatTooltipModule,
   ],
   template: `
     <div class="page-container">
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:16px; display:flex; align-items:center; gap:16px">
         <a mat-button routerLink="/reference">
           <mat-icon>arrow_back</mat-icon> Retour au socle
+        </a>
+        <a mat-stroked-button routerLink="/mes-contributions">
+          <mat-icon>list_alt</mat-icon> Mes contributions
         </a>
       </div>
 
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:start">
 
-        <!-- Colonne gauche : sélection de section + texte de référence -->
+        <!-- Colonne gauche -->
         <div>
           <mat-card>
             <mat-card-header>
@@ -82,21 +89,19 @@ const QUILL_MODULES = {
               </mat-form-field>
 
               @if (currentSection()) {
-                <div>
-                  <p style="font-size:12px; color:#666; margin-bottom:4px">
-                    <strong>Mode :</strong>
-                    {{ currentSection()!.contributionMode === 'structuree' ? 'Formulaire structuré' : 'Commentaire uniquement' }}
-                    &nbsp;·&nbsp;
-                    <strong>Entités :</strong> {{ currentSection()!.entites.join(', ') }}
-                  </p>
-                  <div class="reference-text" style="max-height:300px; overflow:auto; font-size:13px"
-                       [innerHTML]="currentSection()!.texteReference | markdown"></div>
-                </div>
+                <p style="font-size:12px; color:#666; margin-bottom:4px">
+                  <strong>Mode :</strong>
+                  {{ currentSection()!.contributionMode === 'structuree' ? 'Formulaire structuré' : 'Commentaire uniquement' }}
+                  &nbsp;·&nbsp;
+                  <strong>Entités :</strong> {{ currentSection()!.entites.join(', ') }}
+                </p>
+                <div class="reference-text" style="max-height:300px; overflow:auto; font-size:13px"
+                     [innerHTML]="currentSection()!.texteReference | markdown"></div>
               }
             </mat-card-content>
           </mat-card>
 
-          <!-- Inputs existants pour cet axe -->
+          <!-- Inputs existants -->
           @if (existingInputs().length > 0) {
             <mat-card style="margin-top:16px">
               <mat-card-header>
@@ -107,17 +112,30 @@ const QUILL_MODULES = {
                   @for (inp of existingInputs(); track inp.id) {
                     <mat-list-item style="height:auto; padding:8px 0">
                       <div style="width:100%">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap">
                           <span class="section-badge">{{ TYPE_LABELS[inp.type] }}</span>
-                          <span [class]="'chip-' + inp.status" style="font-size:11px; padding:2px 6px; border-radius:4px">
+                          <span [class]="'chip-' + inp.status"
+                                style="font-size:11px; padding:2px 6px; border-radius:4px">
                             {{ STATUS_LABELS[inp.status] }}
                           </span>
+                          @if (inp.status !== 'draft') {
+                            <mat-icon style="font-size:14px; color:#f57c00" matTooltip="Verrouillé — contacter le Super Admin pour rouvrir">lock</mat-icon>
+                          }
                           <span style="font-size:11px; color:#666">{{ inp.entity.code }} · {{ inp.author.email }}</span>
                         </div>
                         @if (inp.title) {
                           <div style="font-weight:500; font-size:13px">{{ inp.title }}</div>
                         }
-                        <div class="rich-content" style="margin-top:2px" [innerHTML]="inp.content"></div>
+                        @if (inp.content) {
+                          <div class="rich-content" style="margin-top:2px; color:#444"
+                               [innerHTML]="inp.content"></div>
+                        }
+                        @if (inp.status === 'draft' && inp.authorUserId === auth.currentUser()?.id) {
+                          <button mat-stroked-button style="margin-top:6px; font-size:12px"
+                                  (click)="resumeDraft(inp)">
+                            <mat-icon>edit</mat-icon> Reprendre ce brouillon
+                          </button>
+                        }
                       </div>
                     </mat-list-item>
                     <mat-divider></mat-divider>
@@ -128,12 +146,14 @@ const QUILL_MODULES = {
           }
         </div>
 
-        <!-- Colonne droite : formulaire de contribution -->
+        <!-- Colonne droite : formulaire -->
         <div>
           <mat-card>
             <mat-card-header>
               <mat-icon mat-card-avatar>edit_note</mat-icon>
-              <mat-card-title>Nouvelle contribution</mat-card-title>
+              <mat-card-title>
+                {{ draftId() ? 'Modifier le brouillon' : 'Nouvelle contribution' }}
+              </mat-card-title>
               <mat-card-subtitle>
                 Entité : <strong>{{ auth.getEntityLabel() }}</strong>
               </mat-card-subtitle>
@@ -145,81 +165,168 @@ const QUILL_MODULES = {
                   Sélectionnez un axe à gauche pour commencer
                 </p>
               } @else {
+                <!-- Indicateur auto-save -->
+                @if (autosaveLabel()) {
+                  <div style="font-size:12px; color:#888; margin-bottom:8px; display:flex; align-items:center; gap:4px">
+                    @if (autosaving()) {
+                      <mat-spinner diameter="12"></mat-spinner>
+                    } @else {
+                      <mat-icon style="font-size:14px">save</mat-icon>
+                    }
+                    {{ autosaveLabel() }}
+                  </div>
+                }
+
                 <form [formGroup]="form" (ngSubmit)="submit()" style="display:flex; flex-direction:column; gap:16px">
 
+                  <!-- Sélection du type (filtré selon inputTypes de la section) -->
                   <mat-form-field appearance="outline">
                     <mat-label>Type de contribution</mat-label>
                     <mat-select formControlName="type">
-                      @if (currentSection()?.contributionMode === 'structuree') {
-                        <mat-option value="activity">Activité</mat-option>
-                        <mat-option value="indicator">Indicateur</mat-option>
-                        <mat-option value="milestone">Jalon</mat-option>
-                        <mat-option value="risk">Risque</mat-option>
+                      @for (t of allowedTypes(); track t) {
+                        <mat-option [value]="t">{{ TYPE_LABELS[t] }}</mat-option>
                       }
-                      <mat-option value="comment">Commentaire</mat-option>
                     </mat-select>
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
-                    <mat-label>Titre (optionnel)</mat-label>
-                    <input matInput formControlName="title" />
-                  </mat-form-field>
+                  <!-- Titre -->
+                  @if (selectedType() !== 'comment') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>
+                        {{ selectedType() === 'milestone' ? 'Description du jalon *' :
+                           selectedType() === 'indicator' ? 'Intitulé de l\'indicateur *' :
+                           selectedType() === 'risk' ? 'Description du risque *' : 'Titre *' }}
+                      </mat-label>
+                      <input matInput formControlName="title" />
+                    </mat-form-field>
+                  }
 
-                  <!-- Éditeur riche pour le contenu principal -->
-                  <div class="quill-field">
-                    <div class="field-label">Contenu *</div>
-                    <quill-editor
-                      formControlName="content"
-                      [modules]="quillModules"
-                      placeholder="Décrivez votre contribution…"
-                      theme="snow">
-                    </quill-editor>
-                    @if (form.get('content')?.invalid && form.get('content')?.touched) {
-                      <span style="color:#f44336; font-size:12px">Le contenu est obligatoire</span>
-                    }
-                  </div>
-
-                  @if (isStructured()) {
-                    <mat-divider></mat-divider>
-                    <p style="font-size:12px; font-weight:600; color:#555; margin:0">Champs structurés (optionnels)</p>
-
+                  <!-- Contenu principal -->
+                  @if (selectedType() === 'activity' || selectedType() === 'comment') {
                     <div class="quill-field">
-                      <div class="field-label">Intrant (means / ressources)</div>
+                      <div class="field-label">
+                        {{ selectedType() === 'comment' ? 'Commentaire *' : 'Description *' }}
+                      </div>
+                      <quill-editor formControlName="content" [modules]="quillModules"
+                                    placeholder="Saisissez votre texte…" theme="snow"></quill-editor>
+                    </div>
+                  }
+
+                  <!-- Champs type: activite -->
+                  @if (selectedType() === 'activity') {
+                    <div class="quill-field">
+                      <div class="field-label">Intrant (moyens / ressources)</div>
                       <quill-editor formControlName="means" [modules]="quillModules" theme="snow"></quill-editor>
                     </div>
-
                     <div class="quill-field">
-                      <div class="field-label">Extrant attendu (output)</div>
+                      <div class="field-label">Extrant attendu</div>
                       <quill-editor formControlName="output" [modules]="quillModules" theme="snow"></quill-editor>
                     </div>
-
                     <mat-form-field appearance="outline">
-                      <mat-label>Méthode de vérification</mat-label>
+                      <mat-label>Objectif rattaché (ex: obj1)</mat-label>
+                      <input matInput formControlName="objective" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Précédent / source (optionnel)</mat-label>
+                      <input matInput formControlName="sourceRef" />
+                    </mat-form-field>
+                  }
+
+                  <!-- Champs type: jalon -->
+                  @if (selectedType() === 'milestone') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Livrable attendu *</mat-label>
+                      <input matInput formControlName="deliverable" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Méthode de vérification *</mat-label>
                       <input matInput formControlName="verificationMethod" />
                     </mat-form-field>
-
                     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
                       <mat-form-field appearance="outline">
-                        <mat-label>Valeur cible</mat-label>
-                        <input matInput formControlName="targetValue" />
+                        <mat-label>Mois d'échéance * (M1–M6)</mat-label>
+                        <mat-select formControlName="dueMonth">
+                          @for (m of ['M1','M2','M3','M4','M5','M6']; track m) {
+                            <mat-option [value]="m">{{ m }}</mat-option>
+                          }
+                        </mat-select>
                       </mat-form-field>
                       <mat-form-field appearance="outline">
-                        <mat-label>Échéance (ex: M3, M6)</mat-label>
-                        <input matInput formControlName="dueMonth" />
+                        <mat-label>Montant proposé (optionnel)</mat-label>
+                        <input matInput formControlName="paymentAmountProposed" placeholder="ex: 15 000 USD" />
                       </mat-form-field>
                     </div>
                   }
 
-                  <div style="display:flex; gap:12px; justify-content:flex-end">
+                  <!-- Champs type: indicateur -->
+                  @if (selectedType() === 'indicator') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Base / ligne de référence</mat-label>
+                      <input matInput formControlName="baseline" placeholder="ex: à mesurer" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Valeur cible *</mat-label>
+                      <input matInput formControlName="targetValue" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Source de donnée *</mat-label>
+                      <input matInput formControlName="dataSource" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Fréquence *</mat-label>
+                      <mat-select formControlName="frequency">
+                        <mat-option value="Mensuel">Mensuel</mat-option>
+                        <mat-option value="Trimestriel">Trimestriel</mat-option>
+                        <mat-option value="Ponctuel M2">Ponctuel M2</mat-option>
+                        <mat-option value="Ponctuel M3">Ponctuel M3</mat-option>
+                        <mat-option value="Ponctuel M6">Ponctuel M6</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+                  }
+
+                  <!-- Champs type: risque -->
+                  @if (selectedType() === 'risk') {
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+                      <mat-form-field appearance="outline">
+                        <mat-label>Probabilité *</mat-label>
+                        <mat-select formControlName="likelihood">
+                          <mat-option value="Faible">Faible</mat-option>
+                          <mat-option value="Moyenne">Moyenne</mat-option>
+                          <mat-option value="Elevee">Elevée</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline">
+                        <mat-label>Impact *</mat-label>
+                        <mat-select formControlName="impact">
+                          <mat-option value="Faible">Faible</mat-option>
+                          <mat-option value="Moyen">Moyen</mat-option>
+                          <mat-option value="Eleve">Élevé</mat-option>
+                        </mat-select>
+                      </mat-form-field>
+                    </div>
+                    <div class="quill-field">
+                      <div class="field-label">Mesure d'atténuation *</div>
+                      <quill-editor formControlName="mitigation" [modules]="quillModules" theme="snow"></quill-editor>
+                    </div>
+                  }
+
+                  <!-- Champs type: commentaire -->
+                  @if (selectedType() === 'comment') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Référence au passage visé (optionnel)</mat-label>
+                      <input matInput formControlName="targetRef" placeholder="ex: §3 ligne 2" />
+                    </mat-form-field>
+                  }
+
+                  <div style="display:flex; gap:12px; justify-content:flex-end; align-items:center">
                     <button mat-stroked-button type="button" (click)="resetForm()">
                       <mat-icon>clear</mat-icon> Effacer
                     </button>
-                    <button mat-raised-button color="primary" type="submit"
-                            [disabled]="isContentEmpty() || submitting()">
+                    <button mat-raised-button color="primary" type="submit" [disabled]="submitting()">
                       @if (submitting()) {
                         <mat-spinner diameter="20" style="margin:auto"></mat-spinner>
                       } @else {
-                        <mat-icon>send</mat-icon> Soumettre
+                        <ng-container><mat-icon>send</mat-icon> Soumettre</ng-container>
                       }
                     </button>
                   </div>
@@ -233,18 +340,28 @@ const QUILL_MODULES = {
   `,
   styles: [``],
 })
-export class ContributeComponent implements OnInit {
+export class ContributeComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private sectionsService = inject(SectionsService);
   private inputsService = inject(InputsService);
   private snackBar = inject(MatSnackBar);
   private fb = inject(FormBuilder);
+  private destroy$ = new Subject<void>();
+  private autosaveSubject$ = new Subject<void>();
+  private formValueSub: Subscription | null = null;
+
   auth = inject(AuthService);
 
   sections = signal<ReferenceSection[]>([]);
   currentSection = signal<ReferenceSection | null>(null);
   existingInputs = signal<Input[]>([]);
   submitting = signal(false);
+  autosaving = signal(false);
+  autosaveLabel = signal('');
+
+  private _draftId = signal<string | null>(null);
+  draftId = this._draftId.asReadonly();
+
   selectedSectionId = '';
 
   readonly TYPE_LABELS = TYPE_LABELS;
@@ -252,26 +369,35 @@ export class ContributeComponent implements OnInit {
   readonly quillModules = QUILL_MODULES;
 
   form = this.fb.group({
-    type: ['comment', Validators.required],
+    type: ['comment' as InputType, Validators.required],
     title: [''],
-    content: ['', Validators.required],
+    content: [''],
     means: [''],
     output: [''],
+    objective: [''],
+    sourceRef: [''],
+    deliverable: [''],
     verificationMethod: [''],
-    targetValue: [''],
     dueMonth: [''],
+    paymentAmountProposed: [''],
+    targetValue: [''],
+    baseline: [''],
+    dataSource: [''],
+    frequency: [''],
+    likelihood: [''],
+    impact: [''],
+    mitigation: [''],
+    targetRef: [''],
   });
 
-  isStructured() {
-    return this.form.value.type !== 'comment' && this.currentSection()?.contributionMode === 'structuree';
-  }
+  selectedType = computed(() => (this.form.get('type')?.value as InputType) ?? 'comment');
 
-  isContentEmpty(): boolean {
-    const v = this.form.value.content ?? '';
-    return !v || v === '<p><br></p>' || v.replace(/<[^>]+>/g, '').trim() === '';
-  }
-
-  htmlPreview = htmlToText;
+  allowedTypes = computed<InputType[]>(() => {
+    const section = this.currentSection();
+    if (!section) return ['comment'];
+    const types = section.inputTypes as InputType[];
+    return types.length > 0 ? types : ['comment'];
+  });
 
   ngOnInit() {
     this.sectionsService.getAll().subscribe(sections => {
@@ -282,48 +408,176 @@ export class ContributeComponent implements OnInit {
         this.onSectionChange(paramId);
       }
     });
+
+    this.autosaveSubject$.pipe(
+      debounceTime(2500),
+      takeUntil(this.destroy$),
+    ).subscribe(() => this.runAutosave());
+  }
+
+  ngOnDestroy() {
+    this.formValueSub?.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   onSectionChange(id: string) {
     this.selectedSectionId = id;
     const section = this.sections().find(s => s.id === id);
     this.currentSection.set(section ?? null);
+    this._draftId.set(null);
+    this.autosaveLabel.set('');
+
+    const defaultType = section?.inputTypes?.[0] as InputType ?? 'comment';
+    this.form.patchValue({ type: defaultType });
+
     this.loadExistingInputs(id);
+
+    // Watch for form changes to trigger auto-save (unsubscribe previous section first)
+    this.formValueSub?.unsubscribe();
+    this.formValueSub = this.form.valueChanges.pipe(
+      debounceTime(100),
+      distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+    ).subscribe(() => this.autosaveSubject$.next());
   }
 
   loadExistingInputs(sectionId: string) {
     this.inputsService.getAll({ sectionId }).subscribe(inputs => this.existingInputs.set(inputs));
   }
 
+  resumeDraft(inp: Input) {
+    this._draftId.set(inp.id);
+    this.form.patchValue({
+      type: inp.type,
+      title: inp.title ?? '',
+      content: inp.content ?? '',
+      means: inp.means ?? '',
+      output: inp.output ?? '',
+      objective: inp.objective ?? '',
+      sourceRef: inp.sourceRef ?? '',
+      deliverable: inp.deliverable ?? '',
+      verificationMethod: inp.verificationMethod ?? '',
+      dueMonth: inp.dueMonth ?? '',
+      paymentAmountProposed: inp.paymentAmountProposed ?? '',
+      targetValue: inp.targetValue ?? '',
+      baseline: inp.baseline ?? '',
+      dataSource: inp.dataSource ?? '',
+      frequency: inp.frequency ?? '',
+      likelihood: inp.likelihood ?? '',
+      impact: inp.impact ?? '',
+      mitigation: inp.mitigation ?? '',
+      targetRef: inp.targetRef ?? '',
+    });
+    this.autosaveLabel.set('Brouillon chargé');
+    this.snackBar.open('Brouillon repris', 'OK', { duration: 2000 });
+  }
+
+  private runAutosave() {
+    if (!this.selectedSectionId) return;
+    const v = this.form.value;
+    const payload = this.buildPayload(v);
+
+    this.autosaving.set(true);
+    this.autosaveLabel.set('Enregistrement...');
+
+    const now = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    if (this._draftId()) {
+      this.inputsService.update(this._draftId()!, payload).subscribe({
+        next: () => { this.autosaving.set(false); this.autosaveLabel.set(`Brouillon enregistré à ${now()}`); },
+        error: () => { this.autosaving.set(false); this.autosaveLabel.set('Erreur d\'enregistrement'); },
+      });
+    } else {
+      this.inputsService.create({
+        referenceSectionId: this.selectedSectionId,
+        ...payload,
+      }).subscribe({
+        next: (inp) => {
+          this._draftId.set(inp.id);
+          this.autosaving.set(false);
+          this.autosaveLabel.set(`Brouillon enregistré à ${now()}`);
+          this.loadExistingInputs(this.selectedSectionId);
+        },
+        error: () => { this.autosaving.set(false); this.autosaveLabel.set('Erreur d\'enregistrement'); },
+      });
+    }
+  }
+
   submit() {
-    if (this.isContentEmpty() || !this.selectedSectionId) return;
+    if (this.submitting()) return;
     this.submitting.set(true);
     const v = this.form.value;
-    this.inputsService.create({
-      referenceSectionId: this.selectedSectionId,
-      type: v.type as InputType,
-      content: v.content!,
-      title: v.title || undefined,
-      means: v.means || undefined,
-      output: v.output || undefined,
-      verificationMethod: v.verificationMethod || undefined,
-      targetValue: v.targetValue || undefined,
-      dueMonth: v.dueMonth || undefined,
-    }).subscribe({
-      next: () => {
-        this.submitting.set(false);
-        this.snackBar.open('Contribution soumise avec succès !', 'OK', { duration: 3000 });
-        this.resetForm();
-        this.loadExistingInputs(this.selectedSectionId);
-      },
-      error: (e) => {
-        this.submitting.set(false);
-        this.snackBar.open(e.error?.message ?? 'Erreur lors de la soumission', 'Fermer', { duration: 5000 });
-      },
-    });
+    const payload = this.buildPayload(v);
+
+    const doSubmit = (id: string) => {
+      this.inputsService.updateStatus(id, 'submitted').subscribe({
+        next: () => {
+          this.submitting.set(false);
+          this.snackBar.open('Contribution soumise avec succès !', 'OK', { duration: 3000 });
+          this._draftId.set(null);
+          this.resetForm();
+          this.loadExistingInputs(this.selectedSectionId);
+        },
+        error: (e) => {
+          this.submitting.set(false);
+          this.snackBar.open(e.error?.message ?? 'Erreur lors de la soumission', 'Fermer', { duration: 5000 });
+        },
+      });
+    };
+
+    if (this._draftId()) {
+      this.inputsService.update(this._draftId()!, payload).subscribe({
+        next: () => doSubmit(this._draftId()!),
+        error: (e) => {
+          this.submitting.set(false);
+          this.snackBar.open(e.error?.message ?? 'Erreur', 'Fermer', { duration: 5000 });
+        },
+      });
+    } else {
+      this.inputsService.create({
+        referenceSectionId: this.selectedSectionId,
+        ...payload,
+      }).subscribe({
+        next: (inp) => {
+          this._draftId.set(inp.id);
+          doSubmit(inp.id);
+        },
+        error: (e) => {
+          this.submitting.set(false);
+          this.snackBar.open(e.error?.message ?? 'Erreur', 'Fermer', { duration: 5000 });
+        },
+      });
+    }
+  }
+
+  private buildPayload(v: any) {
+    return {
+      type: (v.type || 'comment') as InputType,
+      ...(v.title && { title: v.title }),
+      ...(v.content && { content: v.content }),
+      ...(v.means && { means: v.means }),
+      ...(v.output && { output: v.output }),
+      ...(v.objective && { objective: v.objective }),
+      ...(v.sourceRef && { sourceRef: v.sourceRef }),
+      ...(v.deliverable && { deliverable: v.deliverable }),
+      ...(v.verificationMethod && { verificationMethod: v.verificationMethod }),
+      ...(v.dueMonth && { dueMonth: v.dueMonth }),
+      ...(v.paymentAmountProposed && { paymentAmountProposed: v.paymentAmountProposed }),
+      ...(v.targetValue && { targetValue: v.targetValue }),
+      ...(v.baseline && { baseline: v.baseline }),
+      ...(v.dataSource && { dataSource: v.dataSource }),
+      ...(v.frequency && { frequency: v.frequency }),
+      ...(v.likelihood && { likelihood: v.likelihood }),
+      ...(v.impact && { impact: v.impact }),
+      ...(v.mitigation && { mitigation: v.mitigation }),
+      ...(v.targetRef && { targetRef: v.targetRef }),
+    };
   }
 
   resetForm() {
-    this.form.reset({ type: 'comment' });
+    this._draftId.set(null);
+    this.autosaveLabel.set('');
+    const defaultType = this.currentSection()?.inputTypes?.[0] as InputType ?? 'comment';
+    this.form.reset({ type: defaultType });
   }
 }
