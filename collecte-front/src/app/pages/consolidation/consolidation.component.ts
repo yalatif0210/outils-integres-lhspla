@@ -166,12 +166,13 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                   </tr>
                 }
                 @for (row of paginated(); track row.id) {
-                  <tr>
-                    <!-- Axe -->
-                    <td style="color:#555; font-size:12px"
+                  <tr [style.height.px]="rowHeights()[row.id]">
+                    <!-- Axe — texte complet, CSS gère la troncature selon la largeur -->
+                    <td class="td-axe"
                         [matTooltip]="row.referenceSection?.titre ?? ''"
                         matTooltipShowDelay="400">
-                      {{ row.referenceSection?.titre | slice:0:35 }}...
+                      {{ row.referenceSection?.titre }}
+                      <div class="row-rh" (mousedown)="startRowResize($event, row.id)"></div>
                     </td>
 
                     <!-- Entité -->
@@ -320,15 +321,26 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       word-break: break-word;
     }
 
+    /* Axe : troncature CSS — ellipsis si étroit, texte complet si large */
+    .td-axe {
+      position: relative;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #555;
+      font-size: 12px;
+    }
+
     .cons-table tbody tr:hover td {
       background: #f5f5f5;
     }
 
     .td-content {
       cursor: help;
+      white-space: normal;
     }
 
-    /* Poignée de redimensionnement */
+    /* Poignée resize colonne */
     .rh {
       position: absolute;
       right: 0;
@@ -341,6 +353,21 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
     .rh:hover {
       background: rgba(21, 101, 192, 0.2);
       border-right: 2px solid #1565c0;
+    }
+
+    /* Poignée resize ligne */
+    .row-rh {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 5px;
+      cursor: row-resize;
+      z-index: 1;
+    }
+    .row-rh:hover {
+      background: rgba(21, 101, 192, 0.18);
+      border-bottom: 2px solid #1565c0;
     }
   `],
 })
@@ -367,6 +394,9 @@ export class ConsolidationComponent implements OnInit {
 
   pageIndex = signal(0);
   pageSize = signal(25);
+
+  /** Hauteurs des lignes par id de contribution (undefined = auto) */
+  rowHeights = signal<Record<string, number>>({});
 
   /** Largeurs initiales des colonnes — utilisées pour l'init et après resize */
   cw = {
@@ -469,6 +499,40 @@ export class ConsolidationComponent implements OnInit {
         document.removeEventListener('mouseup', onUp);
         // Réintégrer la zone Angular pour synchroniser le signal (déclenche CD)
         this.zone.run(() => this.cw[col].set(newW));
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  // ── Resize lignes ────────────────────────────────────────────────────────────
+
+  startRowResize(event: MouseEvent, rowId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const tr = (event.currentTarget as HTMLElement).closest('tr') as HTMLElement;
+    if (!tr) return;
+
+    const startY = event.pageY;
+    const startH = tr.offsetHeight;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'row-resize';
+
+    this.zone.runOutsideAngular(() => {
+      const onMove = (e: MouseEvent) => {
+        tr.style.height = `${Math.max(30, startH + e.pageY - startY)}px`;
+      };
+
+      const onUp = (e: MouseEvent) => {
+        const newH = Math.max(30, startH + e.pageY - startY);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        this.zone.run(() => this.rowHeights.update(h => ({ ...h, [rowId]: newH })));
       };
 
       document.addEventListener('mousemove', onMove);
