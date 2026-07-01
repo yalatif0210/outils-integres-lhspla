@@ -39,7 +39,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           }),
           catchError(() => {
             const returnUrl = encodeURIComponent(window.location.href);
-            window.location.href = `${environment.mainAppUrl}?returnUrl=${returnUrl}`;
+            window.location.href = `${environment.mainAppUrl}/login?returnUrl=${returnUrl}`;
             return throwError(() => error);
           }),
         );
