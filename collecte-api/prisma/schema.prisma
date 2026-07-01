@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Entity {
+  id    String @id @default(uuid())
+  code  String @unique
+  label String
+
+  inputs   Input[]
+  appUsers AppUser[]
+
+  @@map("entity")
+}
+
+model ReferenceSection {
+  id               String   @id
+  titre            String
+  rubriqueNofo     String
+  objectif         String
+  entites          String[]
+  ordre            Int      @unique
+  contributionMode String   @default("lecture_seule")
+  texteReference   String
+
+  inputs Input[]
+
+  @@map("reference_section")
+}
+
+model AppUser {
+  id       String  @id
+  email    String  @unique
+  entityId String?
+  entity   Entity? @relation(fields: [entityId], references: [id])
+
+  inputs         Input[]
+  inputRevisions InputRevision[]
+
+  @@map("app_user")
+}
+
+model Input {
+  id                 String           @id @default(uuid())
+  referenceSectionId String
+  referenceSection   ReferenceSection @relation(fields: [referenceSectionId], references: [id])
+  entityId           String
+  entity             Entity           @relation(fields: [entityId], references: [id])
+  authorUserId       String
+  author             AppUser          @relation(fields: [authorUserId], references: [id])
+
+  type    InputType
+  title   String?
+  content String
+
+  means              String?
+  output             String?
+  verificationMethod String?
+  targetValue        String?
+  dueMonth           String?
+
+  status InputStatus @default(draft)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  revisions InputRevision[]
+
+  @@map("input")
+}
+
+enum InputType {
+  activity
+  indicator
+  milestone
+  comment
+  risk
+}
+
+enum InputStatus {
+  draft
+  submitted
+  retained
+  rejected
+}
+
+model InputRevision {
+  id           String  @id @default(uuid())
+  inputId      String
+  input        Input   @relation(fields: [inputId], references: [id], onDelete: Cascade)
+  editorUserId String
+  editor       AppUser @relation(fields: [editorUserId], references: [id])
+
+  changeType String
+  snapshot   Json
+
+  createdAt DateTime @default(now())
+
+  @@map("input_revision")
+}

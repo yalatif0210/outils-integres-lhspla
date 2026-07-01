@@ -7,8 +7,10 @@ on:
 env:
   REGISTRY: ghcr.io
   APP_DIR: /home/markov/lhspla
-  API_IMAGE: ghcr.io/${{ github.repository }}/lhspla-api
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/lhspla-frontend
+  API_IMAGE:           ghcr.io/${{ github.repository }}/lhspla-api
+  FRONTEND_IMAGE:      ghcr.io/${{ github.repository }}/lhspla-frontend
+  COLLECTE_API_IMAGE:  ghcr.io/${{ github.repository }}/collecte-api
+  COLLECTE_FRONT_IMAGE: ghcr.io/${{ github.repository }}/collecte-front
 
 jobs:
   # ── Build & Push images ─────────────────────────────────────────────────────
@@ -55,6 +57,30 @@ jobs:
             ${{ env.FRONTEND_IMAGE }}:staging
             ${{ env.FRONTEND_IMAGE }}:staging-${{ github.sha }}
           cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:staging
+          cache-to:   type=inline
+
+      - name: Build & Push Collecte API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/collecte-api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.COLLECTE_API_IMAGE }}:staging
+            ${{ env.COLLECTE_API_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.COLLECTE_API_IMAGE }}:staging
+          cache-to:   type=inline
+
+      - name: Build & Push Collecte Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/collecte-front/Dockerfile
+          push: true
+          tags: |
+            ${{ env.COLLECTE_FRONT_IMAGE }}:staging
+            ${{ env.COLLECTE_FRONT_IMAGE }}:staging-${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.COLLECTE_FRONT_IMAGE }}:staging
           cache-to:   type=inline
 
   # ── Deploy Staging ──────────────────────────────────────────────────────────
@@ -139,6 +165,7 @@ jobs:
           script: |
             sleep 10
             docker exec stg-api sh -c "npx tsx prisma/seed.ts" 2>/dev/null || true
+            docker exec stg-collecte-api sh -c "npm run db:seed" 2>/dev/null || true
 
       - name: Health check staging (nginx → api)
         uses: appleboy/ssh-action@v1.0.3

@@ -56,9 +56,39 @@ services:
     ports:
       - "8080:80"
     environment:
-      API_HOST: stg-api
+      API_HOST:            stg-api
+      COLLECTE_FRONT_HOST: stg-collecte-front
+      COLLECTE_API_HOST:   stg-collecte-api
     depends_on:
       - stg-api
+      - stg-collecte-front
+      - stg-collecte-api
+    networks:
+      - lhspla-stg-net
+
+  # ── Module Collecte — API NestJS staging ─────────────────────────────────────
+  stg-collecte-api:
+    image: ghcr.io/${GITHUB_REPOSITORY}/collecte-api:staging
+    container_name: stg-collecte-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${STG_DB_PASSWORD}@stg-db:5432/lhspla_staging?schema=collecte
+      JWT_SECRET:   ${STG_JWT_SECRET}
+      AUTH_MODE:    sso
+      JWT_ENTITY_CLAIM: entityCode
+      PORT:         3001
+      COLLECTE_FRONT_URL: http://vps.lhspla-ci.org:8080
+    depends_on:
+      stg-db:
+        condition: service_healthy
+    networks:
+      - lhspla-stg-net
+
+  # ── Module Collecte — Frontend Angular staging ────────────────────────────────
+  stg-collecte-front:
+    image: ghcr.io/${GITHUB_REPOSITORY}/collecte-front:staging
+    container_name: stg-collecte-front
+    restart: unless-stopped
     networks:
       - lhspla-stg-net
 

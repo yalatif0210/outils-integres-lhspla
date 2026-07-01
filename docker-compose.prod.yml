@@ -56,9 +56,39 @@ services:
     ports:
       - "127.0.0.1:8090:80"   # Accessible uniquement en local — nginx système proxie
     environment:
-      API_HOST: prod-api
+      API_HOST:            prod-api
+      COLLECTE_FRONT_HOST: prod-collecte-front
+      COLLECTE_API_HOST:   prod-collecte-api
     depends_on:
       - prod-api
+      - prod-collecte-front
+      - prod-collecte-api
+    networks:
+      - lhspla-prod-net
+
+  # ── Module Collecte — API NestJS production ───────────────────────────────────
+  prod-collecte-api:
+    image: ghcr.io/${GITHUB_REPOSITORY}/collecte-api:prod
+    container_name: prod-collecte-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${PROD_DB_PASSWORD}@prod-db:5432/lhspla_prod?schema=collecte
+      JWT_SECRET:   ${PROD_JWT_SECRET}
+      AUTH_MODE:    sso
+      JWT_ENTITY_CLAIM: entityCode
+      PORT:         3001
+      COLLECTE_FRONT_URL: https://vps.lhspla-ci.org
+    depends_on:
+      prod-db:
+        condition: service_healthy
+    networks:
+      - lhspla-prod-net
+
+  # ── Module Collecte — Frontend Angular production ─────────────────────────────
+  prod-collecte-front:
+    image: ghcr.io/${GITHUB_REPOSITORY}/collecte-front:prod
+    container_name: prod-collecte-front
+    restart: unless-stopped
     networks:
       - lhspla-prod-net
 
