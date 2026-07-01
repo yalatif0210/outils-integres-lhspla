@@ -352,6 +352,7 @@ export class ContributeComponent implements OnInit, OnDestroy {
 
   private _draftId = signal<string | null>(null);
   draftId = this._draftId.asReadonly();
+  private isSaving = false;
 
   selectedSectionId = '';
 
@@ -426,6 +427,7 @@ export class ContributeComponent implements OnInit, OnDestroy {
     const section = this.sections().find(s => s.id === id);
     this.currentSection.set(section ?? null);
     this._draftId.set(null);
+    this.isSaving = false;
     this.autosaveLabel.set('');
 
     const defaultType = section?.inputTypes?.[0] as InputType ?? 'comment';
@@ -484,21 +486,22 @@ export class ContributeComponent implements OnInit, OnDestroy {
   }
 
   private runAutosave() {
-    if (!this.selectedSectionId) return;
+    if (!this.selectedSectionId || this.isSaving || this.submitting()) return;
     const v = this.form.value;
-    // Ne sauvegarder que si l'utilisateur a saisi quelque chose
     if (!this.hasContent(v)) return;
     const payload = this.buildPayload(v);
 
+    this.isSaving = true;
     this.autosaving.set(true);
     this.autosaveLabel.set('Enregistrement...');
 
     const now = () => new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    const done = () => { this.isSaving = false; this.autosaving.set(false); };
 
     if (this._draftId()) {
       this.inputsService.update(this._draftId()!, payload).subscribe({
-        next: () => { this.autosaving.set(false); this.autosaveLabel.set(`Brouillon enregistré à ${now()}`); },
-        error: () => { this.autosaving.set(false); this.autosaveLabel.set('Erreur d\'enregistrement'); },
+        next: () => { done(); this.autosaveLabel.set(`Brouillon enregistré à ${now()}`); },
+        error: () => { done(); this.autosaveLabel.set('Erreur d\'enregistrement'); },
       });
     } else {
       this.inputsService.create({
@@ -507,11 +510,11 @@ export class ContributeComponent implements OnInit, OnDestroy {
       }).subscribe({
         next: (inp) => {
           this._draftId.set(inp.id);
-          this.autosaving.set(false);
+          done();
           this.autosaveLabel.set(`Brouillon enregistré à ${now()}`);
           this.loadExistingInputs(this.selectedSectionId);
         },
-        error: () => { this.autosaving.set(false); this.autosaveLabel.set('Erreur d\'enregistrement'); },
+        error: () => { done(); this.autosaveLabel.set('Erreur d\'enregistrement'); },
       });
     }
   }
@@ -589,6 +592,7 @@ export class ContributeComponent implements OnInit, OnDestroy {
 
   resetForm() {
     this._draftId.set(null);
+    this.isSaving = false;
     this.autosaveLabel.set('');
     const defaultType = this.currentSection()?.inputTypes?.[0] as InputType ?? 'comment';
     this.form.reset({ type: defaultType }, { emitEvent: false });
