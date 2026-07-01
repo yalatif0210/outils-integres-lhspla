@@ -13,10 +13,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
+import { QuillEditorComponent } from 'ngx-quill';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
 import { InputsService, Input, InputType, InputStatus } from '../../services/inputs.service';
 import { AuthService } from '../../services/auth.service';
-import { MarkdownPipe } from '../../pipes/markdown.pipe';
+import { MarkdownPipe, htmlToText } from '../../pipes/markdown.pipe';
 
 const TYPE_LABELS: Record<InputType, string> = {
   activity: 'Activité',
@@ -33,11 +34,20 @@ const STATUS_LABELS: Record<InputStatus, string> = {
   rejected: 'Rejeté',
 };
 
+const QUILL_MODULES = {
+  toolbar: [
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ list: 'ordered' }, { list: 'bullet' }],
+    [{ indent: '-1' }, { indent: '+1' }],
+    ['clean'],
+  ],
+};
+
 @Component({
   selector: 'app-contribute',
   standalone: true,
   imports: [
-    CommonModule, RouterLink, ReactiveFormsModule, MarkdownPipe,
+    CommonModule, RouterLink, ReactiveFormsModule, MarkdownPipe, QuillEditorComponent,
     MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatChipsModule, MatProgressSpinnerModule,
     MatSnackBarModule, MatDividerModule, MatListModule,
@@ -107,9 +117,7 @@ const STATUS_LABELS: Record<InputStatus, string> = {
                         @if (inp.title) {
                           <div style="font-weight:500; font-size:13px">{{ inp.title }}</div>
                         }
-                        <div style="font-size:13px; color:#444; margin-top:2px; line-height:1.4">
-                          {{ inp.content | slice:0:200 }}{{ inp.content.length > 200 ? '…' : '' }}
-                        </div>
+                        <div class="rich-content" style="margin-top:2px" [innerHTML]="inp.content"></div>
                       </div>
                     </mat-list-item>
                     <mat-divider></mat-divider>
@@ -157,25 +165,33 @@ const STATUS_LABELS: Record<InputStatus, string> = {
                     <input matInput formControlName="title" />
                   </mat-form-field>
 
-                  <mat-form-field appearance="outline">
-                    <mat-label>Contenu *</mat-label>
-                    <textarea matInput formControlName="content" rows="5" placeholder="Décrivez votre contribution…"></textarea>
-                    <mat-error>Le contenu est obligatoire</mat-error>
-                  </mat-form-field>
+                  <!-- Éditeur riche pour le contenu principal -->
+                  <div class="quill-field">
+                    <div class="field-label">Contenu *</div>
+                    <quill-editor
+                      formControlName="content"
+                      [modules]="quillModules"
+                      placeholder="Décrivez votre contribution…"
+                      theme="snow">
+                    </quill-editor>
+                    @if (form.get('content')?.invalid && form.get('content')?.touched) {
+                      <span style="color:#f44336; font-size:12px">Le contenu est obligatoire</span>
+                    }
+                  </div>
 
                   @if (isStructured()) {
                     <mat-divider></mat-divider>
                     <p style="font-size:12px; font-weight:600; color:#555; margin:0">Champs structurés (optionnels)</p>
 
-                    <mat-form-field appearance="outline">
-                      <mat-label>Intrant (means / ressources)</mat-label>
-                      <textarea matInput formControlName="means" rows="2"></textarea>
-                    </mat-form-field>
+                    <div class="quill-field">
+                      <div class="field-label">Intrant (means / ressources)</div>
+                      <quill-editor formControlName="means" [modules]="quillModules" theme="snow"></quill-editor>
+                    </div>
 
-                    <mat-form-field appearance="outline">
-                      <mat-label>Extrant attendu (output)</mat-label>
-                      <textarea matInput formControlName="output" rows="2"></textarea>
-                    </mat-form-field>
+                    <div class="quill-field">
+                      <div class="field-label">Extrant attendu (output)</div>
+                      <quill-editor formControlName="output" [modules]="quillModules" theme="snow"></quill-editor>
+                    </div>
 
                     <mat-form-field appearance="outline">
                       <mat-label>Méthode de vérification</mat-label>
@@ -199,7 +215,7 @@ const STATUS_LABELS: Record<InputStatus, string> = {
                       <mat-icon>clear</mat-icon> Effacer
                     </button>
                     <button mat-raised-button color="primary" type="submit"
-                            [disabled]="form.invalid || submitting()">
+                            [disabled]="isContentEmpty() || submitting()">
                       @if (submitting()) {
                         <mat-spinner diameter="20" style="margin:auto"></mat-spinner>
                       } @else {
@@ -233,6 +249,7 @@ export class ContributeComponent implements OnInit {
 
   readonly TYPE_LABELS = TYPE_LABELS;
   readonly STATUS_LABELS = STATUS_LABELS;
+  readonly quillModules = QUILL_MODULES;
 
   form = this.fb.group({
     type: ['comment', Validators.required],
@@ -248,6 +265,13 @@ export class ContributeComponent implements OnInit {
   isStructured() {
     return this.form.value.type !== 'comment' && this.currentSection()?.contributionMode === 'structuree';
   }
+
+  isContentEmpty(): boolean {
+    const v = this.form.value.content ?? '';
+    return !v || v === '<p><br></p>' || v.replace(/<[^>]+>/g, '').trim() === '';
+  }
+
+  htmlPreview = htmlToText;
 
   ngOnInit() {
     this.sectionsService.getAll().subscribe(sections => {
@@ -272,7 +296,7 @@ export class ContributeComponent implements OnInit {
   }
 
   submit() {
-    if (this.form.invalid || !this.selectedSectionId) return;
+    if (this.isContentEmpty() || !this.selectedSectionId) return;
     this.submitting.set(true);
     const v = this.form.value;
     this.inputsService.create({
@@ -286,7 +310,7 @@ export class ContributeComponent implements OnInit {
       targetValue: v.targetValue || undefined,
       dueMonth: v.dueMonth || undefined,
     }).subscribe({
-      next: (created) => {
+      next: () => {
         this.submitting.set(false);
         this.snackBar.open('Contribution soumise avec succès !', 'OK', { duration: 3000 });
         this.resetForm();
