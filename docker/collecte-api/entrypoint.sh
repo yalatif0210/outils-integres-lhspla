@@ -19,7 +19,7 @@ client.connect()
 "
 
 echo "▶ Prisma db push (creation des tables si absentes)..."
-npx prisma db push --accept-data-loss --skip-generate
+npx prisma db push --accept-data-loss
 
 echo "▶ Démarrage NestJS collecte-api..."
 exec node dist/src/main
