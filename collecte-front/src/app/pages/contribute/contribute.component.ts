@@ -434,7 +434,7 @@ export class ContributeComponent implements OnInit, OnDestroy {
     this.autosaveLabel.set('');
 
     const defaultType = section?.inputTypes?.[0] as InputType ?? 'comment';
-    this.form.patchValue({ type: defaultType });
+    this.form.patchValue({ type: defaultType }, { emitEvent: false });
 
     this.loadExistingInputs(id);
 
@@ -472,14 +472,27 @@ export class ContributeComponent implements OnInit, OnDestroy {
       impact: inp.impact ?? '',
       mitigation: inp.mitigation ?? '',
       targetRef: inp.targetRef ?? '',
-    });
+    }, { emitEvent: false });
     this.autosaveLabel.set('Brouillon chargé');
     this.snackBar.open('Brouillon repris', 'OK', { duration: 2000 });
+  }
+
+  private hasContent(v: any): boolean {
+    const fields = ['content', 'title', 'means', 'output', 'objective', 'sourceRef',
+      'deliverable', 'verificationMethod', 'dueMonth', 'paymentAmountProposed',
+      'targetValue', 'baseline', 'dataSource', 'frequency',
+      'likelihood', 'impact', 'mitigation', 'targetRef'];
+    return fields.some(f => {
+      const val = (v[f] ?? '').toString().replace(/<[^>]+>/g, '').trim();
+      return val.length > 0;
+    });
   }
 
   private runAutosave() {
     if (!this.selectedSectionId) return;
     const v = this.form.value;
+    // Ne sauvegarder que si l'utilisateur a saisi quelque chose
+    if (!this.hasContent(v)) return;
     const payload = this.buildPayload(v);
 
     this.autosaving.set(true);
@@ -583,6 +596,6 @@ export class ContributeComponent implements OnInit, OnDestroy {
     this._draftId.set(null);
     this.autosaveLabel.set('');
     const defaultType = this.currentSection()?.inputTypes?.[0] as InputType ?? 'comment';
-    this.form.reset({ type: defaultType });
+    this.form.reset({ type: defaultType }, { emitEvent: false });
   }
 }
