@@ -6,8 +6,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  API_IMAGE: ghcr.io/${{ github.repository }}/lhspla-api
-  FRONTEND_IMAGE: ghcr.io/${{ github.repository }}/lhspla-frontend
+  API_IMAGE:            ghcr.io/${{ github.repository }}/lhspla-api
+  FRONTEND_IMAGE:       ghcr.io/${{ github.repository }}/lhspla-frontend
+  COLLECTE_API_IMAGE:   ghcr.io/${{ github.repository }}/collecte-api
+  COLLECTE_FRONT_IMAGE: ghcr.io/${{ github.repository }}/collecte-front
 
 jobs:
   # ── Vérification staging ────────────────────────────────────────────────────
@@ -73,6 +75,32 @@ jobs:
             ${{ env.FRONTEND_IMAGE }}:prod-${{ github.sha }}
             ${{ env.FRONTEND_IMAGE }}:latest
           cache-from: type=registry,ref=${{ env.FRONTEND_IMAGE }}:prod
+          cache-to:   type=inline
+
+      - name: Build & Push Collecte API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/collecte-api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.COLLECTE_API_IMAGE }}:prod
+            ${{ env.COLLECTE_API_IMAGE }}:prod-${{ github.sha }}
+            ${{ env.COLLECTE_API_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.COLLECTE_API_IMAGE }}:prod
+          cache-to:   type=inline
+
+      - name: Build & Push Collecte Frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/collecte-front/Dockerfile
+          push: true
+          tags: |
+            ${{ env.COLLECTE_FRONT_IMAGE }}:prod
+            ${{ env.COLLECTE_FRONT_IMAGE }}:prod-${{ github.sha }}
+            ${{ env.COLLECTE_FRONT_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.COLLECTE_FRONT_IMAGE }}:prod
           cache-to:   type=inline
 
   # ── Deploy Production ────────────────────────────────────────────────────────
@@ -156,6 +184,7 @@ jobs:
           script: |
             sleep 10
             docker exec prod-api sh -c "npx tsx prisma/seed.ts" 2>/dev/null || true
+            docker exec prod-collecte-api sh -c "npm run db:seed" 2>/dev/null || true
 
       - name: Health check production (nginx → api)
         uses: appleboy/ssh-action@v1.0.3
