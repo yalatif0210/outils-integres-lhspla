@@ -2,7 +2,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY collecte-front/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY collecte-front/ .
 RUN npm run build:prod
