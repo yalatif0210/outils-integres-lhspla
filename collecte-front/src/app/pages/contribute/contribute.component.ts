@@ -14,8 +14,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatDividerModule } from '@angular/material/divider';
-import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { QuillEditorComponent } from 'ngx-quill';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
@@ -54,7 +52,7 @@ const QUILL_MODULES = {
     CommonModule, RouterLink, ReactiveFormsModule, MarkdownPipe, QuillEditorComponent,
     MatCardModule, MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatChipsModule, MatProgressSpinnerModule,
-    MatSnackBarModule, MatDividerModule, MatListModule, MatTooltipModule,
+    MatSnackBarModule, MatTooltipModule,
   ],
   template: `
     <div class="page-container">
@@ -107,40 +105,37 @@ const QUILL_MODULES = {
               <mat-card-header>
                 <mat-card-title>Contributions existantes ({{ existingInputs().length }})</mat-card-title>
               </mat-card-header>
-              <mat-card-content>
-                <mat-list>
+              <mat-card-content style="padding:0 16px">
+                <div>
                   @for (inp of existingInputs(); track inp.id) {
-                    <mat-list-item style="height:auto; padding:8px 0">
-                      <div style="width:100%">
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap">
-                          <span class="section-badge">{{ TYPE_LABELS[inp.type] }}</span>
-                          <span [class]="'chip-' + inp.status"
-                                style="font-size:11px; padding:2px 6px; border-radius:4px">
-                            {{ STATUS_LABELS[inp.status] }}
-                          </span>
-                          @if (inp.status !== 'draft') {
-                            <mat-icon style="font-size:14px; color:#f57c00" matTooltip="Verrouillé — contacter le Super Admin pour rouvrir">lock</mat-icon>
-                          }
-                          <span style="font-size:11px; color:#666">{{ inp.entity.code }} · {{ inp.author.email }}</span>
-                        </div>
-                        @if (inp.title) {
-                          <div style="font-weight:500; font-size:13px">{{ inp.title }}</div>
+                    <div style="padding:10px 0; border-bottom:1px solid #eeeeee">
+                      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap">
+                        <span class="section-badge">{{ TYPE_LABELS[inp.type] }}</span>
+                        <span [class]="'chip-' + inp.status"
+                              style="font-size:11px; padding:2px 6px; border-radius:4px">
+                          {{ STATUS_LABELS[inp.status] }}
+                        </span>
+                        @if (inp.status !== 'draft') {
+                          <mat-icon style="font-size:14px; color:#f57c00" matTooltip="Verrouillé — contacter le Super Admin pour rouvrir">lock</mat-icon>
                         }
-                        @if (inp.content) {
-                          <div class="rich-content" style="margin-top:2px; color:#444"
-                               [innerHTML]="inp.content"></div>
-                        }
-                        @if (inp.status === 'draft' && inp.authorUserId === auth.currentUser()?.id) {
-                          <button mat-stroked-button style="margin-top:6px; font-size:12px"
-                                  (click)="resumeDraft(inp)">
-                            <mat-icon>edit</mat-icon> Reprendre ce brouillon
-                          </button>
-                        }
+                        <span style="font-size:11px; color:#666">{{ inp.entity.code }} · {{ inp.author.email }}</span>
                       </div>
-                    </mat-list-item>
-                    <mat-divider></mat-divider>
+                      @if (inp.title) {
+                        <div style="font-weight:500; font-size:13px">{{ inp.title }}</div>
+                      }
+                      @if (inp.content) {
+                        <div class="rich-content" style="margin-top:2px; color:#444; word-break:break-word; white-space:normal"
+                             [innerHTML]="inp.content"></div>
+                      }
+                      @if (inp.status === 'draft' && inp.authorUserId === auth.currentUser()?.id) {
+                        <button mat-stroked-button style="margin-top:6px; font-size:12px"
+                                (click)="resumeDraft(inp)">
+                          <mat-icon>edit</mat-icon> Reprendre ce brouillon
+                        </button>
+                      }
+                    </div>
                   }
-                </mat-list>
+                </div>
               </mat-card-content>
             </mat-card>
           }

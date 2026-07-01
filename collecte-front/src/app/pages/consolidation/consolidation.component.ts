@@ -282,9 +282,10 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
     /* Tooltip multiline */
     ::ng-deep .multiline-tooltip {
       white-space: pre-line !important;
-      max-width: 420px !important;
-      font-size: 12px !important;
-      line-height: 1.5 !important;
+      max-width: 500px !important;
+      min-width: 260px !important;
+      font-size: 13px !important;
+      line-height: 1.7 !important;
     }
 
     /* Tableau natif */
@@ -317,8 +318,9 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
       border-bottom: 1px solid #eeeeee;
       padding: 8px 12px;
       vertical-align: top;
-      overflow: hidden;
       word-break: break-word;
+      overflow-wrap: break-word;
+      /* pas d'overflow:hidden — le contenu doit s'afficher quand la hauteur de ligne augmente */
     }
 
     /* Axe : troncature CSS — ellipsis si étroit, texte complet si large */
@@ -590,7 +592,7 @@ export class ConsolidationComponent implements OnInit {
   tooltipText(row: any): string {
     const parts: string[] = [];
     if (row.title) parts.push(`[Titre] ${row.title}`);
-    if (row.content) parts.push(htmlToText(row.content, 800));
+    if (row.content) parts.push(htmlToText(row.content, 99999));
     if (row.means) parts.push(`Intrant : ${row.means}`);
     if (row.output) parts.push(`Extrant : ${row.output}`);
     if (row.verificationMethod) parts.push(`Vérification : ${row.verificationMethod}`);
