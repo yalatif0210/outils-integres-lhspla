@@ -11,10 +11,10 @@ import { MatBadgeModule } from '@angular/material/badge';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
 
 const OBJECTIF_LABELS: Record<string, string> = {
-  obj1: 'Obj. 1 — Gouvernance',
-  obj2: 'Obj. 2 — Achat & distribution',
-  obj3: 'Obj. 3 — Écosystème numérique',
-  obj4: 'Obj. 4 — Transition durable',
+  obj1: 'Obj. 1 - Gouvernance',
+  obj2: 'Obj. 2 - Achat & distribution',
+  obj3: 'Obj. 3 - Ecosystème numérique',
+  obj4: 'Obj. 4 - Transition durable',
   transversal: 'Transversal',
 };
 
@@ -42,7 +42,7 @@ const CONTRIBUTION_ICONS: Record<string, string> = {
     <div class="page-container">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px">
         <div>
-          <h1 style="margin:0; font-size:22px; font-weight:600">Socle de référence — Proposition NPSP-CI</h1>
+          <h1 style="margin:0; font-size:22px; font-weight:600">Socle de référence - Proposition NPSP-CI</h1>
           <p style="margin:4px 0 0; color:#666; font-size:14px">
             Validé par le Chief of Party · Lecture seule · 18 axes de contribution
           </p>

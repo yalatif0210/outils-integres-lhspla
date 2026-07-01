@@ -14,7 +14,7 @@ import { environment } from '../environments/environment';
   template: `
     <mat-toolbar color="primary">
       <mat-icon style="margin-right:8px">assignment</mat-icon>
-      <span style="font-weight:600">NPSP-CI — Collecte GHSD</span>
+      <span style="font-weight:600">NPSP-CI - Collecte GHSD</span>
       <span style="flex:1"></span>
 
       <a mat-button routerLink="/reference" routerLinkActive="active-nav">
