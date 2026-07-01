@@ -8,12 +8,10 @@ RUN apt-get update && \
 WORKDIR /app
 
 COPY collecte-api/package*.json ./
-# --ignore-scripts évite que le postinstall de @prisma/client lance prisma generate
-# avant que schema.prisma soit copié (ce qui laisserait le client en état cassé)
-RUN npm install --legacy-peer-deps --ignore-scripts
+COPY collecte-api/prisma ./prisma
+RUN npm install --legacy-peer-deps
 
 COPY collecte-api/ .
-RUN npx prisma generate
 RUN npm run build
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
