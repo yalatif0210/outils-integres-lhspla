@@ -581,20 +581,21 @@ export class ConsolidationComponent implements OnInit {
   preview(html: string): string { return htmlToText(html, 120); }
 
   tooltipText(row: any): string {
+    const t = (v: string) => htmlToText(v, 99999);
     const parts: string[] = [];
     if (row.title) parts.push(`[Titre] ${row.title}`);
-    if (row.content) parts.push(htmlToText(row.content, 99999));
-    if (row.means) parts.push(`Intrant : ${row.means}`);
-    if (row.output) parts.push(`Extrant : ${row.output}`);
-    if (row.verificationMethod) parts.push(`Vérification : ${row.verificationMethod}`);
-    if (row.targetValue) parts.push(`Valeur cible : ${row.targetValue}`);
+    if (row.content) parts.push(t(row.content));
+    if (row.means) parts.push(`Intrant : ${t(row.means)}`);
+    if (row.output) parts.push(`Extrant : ${t(row.output)}`);
+    if (row.verificationMethod) parts.push(`Vérification : ${t(row.verificationMethod)}`);
+    if (row.targetValue) parts.push(`Valeur cible : ${t(row.targetValue)}`);
     if (row.dueMonth) parts.push(`Échéance : ${row.dueMonth}`);
-    if (row.likelihood) parts.push(`Probabilité : ${row.likelihood}`);
-    if (row.impact) parts.push(`Impact : ${row.impact}`);
-    if (row.mitigation) parts.push(`Atténuation : ${row.mitigation}`);
-    if (row.objective) parts.push(`Objectif : ${row.objective}`);
-    if (row.dataSource) parts.push(`Source : ${row.dataSource}`);
-    if (row.frequency) parts.push(`Fréquence : ${row.frequency}`);
+    if (row.likelihood) parts.push(`Probabilité : ${t(row.likelihood)}`);
+    if (row.impact) parts.push(`Impact : ${t(row.impact)}`);
+    if (row.mitigation) parts.push(`Atténuation : ${t(row.mitigation)}`);
+    if (row.objective) parts.push(`Objectif : ${t(row.objective)}`);
+    if (row.dataSource) parts.push(`Source : ${t(row.dataSource)}`);
+    if (row.frequency) parts.push(`Fréquence : ${t(row.frequency)}`);
     return parts.join('\n');
   }
 
