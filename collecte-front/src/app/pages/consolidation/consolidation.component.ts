@@ -18,6 +18,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { InputsService, Input, InputStatus } from '../../services/inputs.service';
 import { SectionsService } from '../../services/sections.service';
 import { environment } from '../../../environments/environment';
+import { htmlToText } from '../../pipes/markdown.pipe';
 
 const TYPE_LABELS: Record<string, string> = {
   activity: 'Activité', indicator: 'Indicateur',
@@ -140,7 +141,7 @@ const TYPE_LABELS: Record<string, string> = {
               @if (row.title) {
                 <div style="font-weight:500; font-size:13px">{{ row.title }}</div>
               }
-              <div style="font-size:13px; color:#444">{{ row.content | slice:0:120 }}{{ row.content.length > 120 ? '…' : '' }}</div>
+              <div class="rich-content" style="color:#444" [innerHTML]="preview(row.content)"></div>
               <div style="font-size:11px; color:#888; margin-top:4px">{{ row.author.email }} · {{ row.createdAt | date:'dd/MM/yyyy HH:mm' }}</div>
             </mat-cell>
           </ng-container>
@@ -253,6 +254,8 @@ export class ConsolidationComponent implements OnInit {
     const labels: Record<InputStatus, string> = { draft: 'Brouillon', submitted: 'Soumis', retained: 'Retenu', rejected: 'Rejeté' };
     return labels[status];
   }
+
+  preview(html: string): string { return htmlToText(html, 120); }
 
   setStatus(input: Input, status: InputStatus) {
     this.inputsService.updateStatus(input.id, status).subscribe({
