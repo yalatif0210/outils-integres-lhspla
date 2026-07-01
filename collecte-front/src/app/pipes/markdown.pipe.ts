@@ -76,8 +76,11 @@ export class MarkdownPipe implements PipeTransform {
   }
 }
 
-/** Utilitaire : extraire le texte brut d'un HTML (aperçu tronqué) */
+/** Extrait le texte brut d'un HTML : supprime les balises ET décode les entités HTML */
 export function htmlToText(html: string, maxLen = 150): string {
-  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!html) return '';
+  // DOMParser gère les entités (&amp; &nbsp; &lt; &#39; etc.) nativement
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
   return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
 }
