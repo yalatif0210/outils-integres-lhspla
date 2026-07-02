@@ -113,7 +113,6 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'comments',
               <mat-option value="activity">Activité</mat-option>
               <mat-option value="indicator">Indicateur</mat-option>
               <mat-option value="milestone">Jalon</mat-option>
-              <mat-option value="comment">Commentaire</mat-option>
               <mat-option value="risk">Risque</mat-option>
             </mat-select>
           </mat-form-field>
@@ -1009,6 +1008,7 @@ export class ConsolidationComponent implements OnInit {
     const typ = this.filterType();
     const ent = this.filterEntity();
     return this.allInputs().filter(i => {
+      if (i.type === 'comment') return false;
       if (sec && i.referenceSectionId !== sec) return false;
       if (sta && i.status !== sta) return false;
       if (typ && i.type !== typ) return false;
