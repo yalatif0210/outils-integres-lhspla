@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './guards/auth.guard';
+import { authGuard, superAdminGuard } from './guards/auth.guard';
+import { unsavedChangesGuard } from './guards/unsaved-changes.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'reference', pathMatch: 'full' },
@@ -11,11 +12,13 @@ export const routes: Routes = [
   {
     path: 'contribute/:sectionId',
     canActivate: [authGuard],
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./pages/contribute/contribute.component').then(m => m.ContributeComponent),
   },
   {
     path: 'contribute',
     canActivate: [authGuard],
+    canDeactivate: [unsavedChangesGuard],
     loadComponent: () => import('./pages/contribute/contribute.component').then(m => m.ContributeComponent),
   },
   {
@@ -30,8 +33,13 @@ export const routes: Routes = [
   },
   {
     path: 'trash',
-    canActivate: [authGuard],
+    canActivate: [superAdminGuard],
     loadComponent: () => import('./pages/trash/trash.component').then(m => m.TrashComponent),
+  },
+  {
+    path: 'aide',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/aide/aide.component').then(m => m.AideComponent),
   },
   { path: '**', redirectTo: 'reference' },
 ];

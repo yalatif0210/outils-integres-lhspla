@@ -12,6 +12,8 @@ export interface ReferenceSection {
   contributionMode: 'structuree' | 'commentaire' | 'lecture_seule';
   inputTypes: string[];
   texteReference: string;
+  partNumber?: number | null;
+  partTitle?: string | null;
   _count?: { inputs: number };
   inputs?: any[];
 }

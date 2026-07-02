@@ -16,7 +16,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
-import { InputsService, Input, InputStatus } from '../../services/inputs.service';
+import { InputsService, Input, InputStatus, InputTranslation, TranslationPayload } from '../../services/inputs.service';
 import { SectionsService } from '../../services/sections.service';
 import { AuthService } from '../../services/auth.service';
 import { htmlToText } from '../../pipes/markdown.pipe';
@@ -54,12 +54,18 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
               <mat-icon>delete_sweep</mat-icon> Corbeille (SA)
             </a>
           }
-          @if (auth.isSuperAdmin() || auth.isPmo()) {
-            <button mat-stroked-button (click)="downloadGlobalDocx()" [disabled]="downloading()">
-              <mat-icon>description</mat-icon> Export Word global
+          @if (auth.isSuperAdmin() || auth.isPmo() || auth.isCop()) {
+            <button mat-stroked-button (click)="downloadGlobalDocx('fr')" [disabled]="downloading()">
+              <mat-icon>description</mat-icon> Word FR
             </button>
-            <button mat-stroked-button (click)="downloadGlobalXlsx()" [disabled]="downloading()">
-              <mat-icon>table_chart</mat-icon> Export Excel global
+            <button mat-stroked-button (click)="downloadGlobalDocx('en')" [disabled]="downloading()">
+              <mat-icon>description</mat-icon> Word EN
+            </button>
+            <button mat-stroked-button (click)="downloadGlobalXlsx('fr')" [disabled]="downloading()">
+              <mat-icon>table_chart</mat-icon> Excel FR
+            </button>
+            <button mat-stroked-button (click)="downloadGlobalXlsx('en')" [disabled]="downloading()">
+              <mat-icon>table_chart</mat-icon> Excel EN
             </button>
           }
         </div>
@@ -311,7 +317,20 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                 </button>
               </div>
 
-              <!-- Corps -->
+              <!-- Onglets FR / EN -->
+              <div style="display:flex; border-bottom:1px solid #e0e0e0; background:#fafafa">
+                <button (click)="tabLang.set('fr')"
+                        style="flex:1; padding:8px; border:none; cursor:pointer; font-weight:600; font-size:13px"
+                        [style.border-bottom]="tabLang()==='fr' ? '3px solid #1565c0' : '3px solid transparent'"
+                        [style.color]="tabLang()==='fr' ? '#1565c0' : '#666'">FR</button>
+                <button (click)="tabLang.set('en')"
+                        style="flex:1; padding:8px; border:none; cursor:pointer; font-weight:600; font-size:13px"
+                        [style.border-bottom]="tabLang()==='en' ? '3px solid #1565c0' : '3px solid transparent'"
+                        [style.color]="tabLang()==='en' ? '#1565c0' : '#666'">EN</button>
+              </div>
+
+              <!-- Corps FR -->
+              @if (tabLang() === 'fr') {
               <div class="dp-body">
 
                 @if (selectedRow()!.title) {
@@ -456,6 +475,228 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                 }
 
               </div>
+              } <!-- end tabLang === fr -->
+
+              <!-- Corps EN -->
+              @if (tabLang() === 'en') {
+              <div class="dp-body">
+                <!-- Bouton Traduire -->
+                @if (canEditTranslation()) {
+                  <div style="display:flex; justify-content:flex-end; margin-bottom:12px">
+                    <button mat-stroked-button [disabled]="translating()" (click)="autoTranslate()"
+                            matTooltip="Traduit tous les champs via IA (écrase la traduction existante)">
+                      @if (translating()) {
+                        <mat-spinner diameter="16" style="display:inline-block; margin-right:6px"></mat-spinner> Traduction…
+                      } @else {
+                        <ng-container><mat-icon>auto_awesome</mat-icon> Traduire</ng-container>
+                      }
+                    </button>
+                  </div>
+                }
+
+                @if (!canEditTranslation()) {
+                  <p style="color:#888; font-size:13px; text-align:center; padding:16px">
+                    <mat-icon style="display:block; margin-bottom:8px">lock</mat-icon>
+                    La traduction EN n'est modifiable que par PMO, COP ou Super Admin (ou par l'auteur si l'input est en brouillon).
+                  </p>
+                }
+
+                @if (selectedRow()!.type !== 'comment') {
+                  <div class="dp-block">
+                    <div class="dp-label">Title (EN) <span style="color:#888;font-weight:400;text-transform:none">— FR : {{ selectedRow()!.title }}</span></div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().title ?? ''"
+                             (input)="setTrans('title', $any($event.target).value)"
+                             placeholder="Title in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.title || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.content) {
+                  <div class="dp-block">
+                    <div class="dp-label">Content (EN) <span style="color:#888;font-weight:400;text-transform:none">— FR (extrait)</span></div>
+                    @if (canEditTranslation()) {
+                      <textarea rows="4"
+                                style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                                [value]="translationDraft().content ?? ''"
+                                (input)="setTrans('content', $any($event.target).value)"
+                                placeholder="Content in English…"></textarea>
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.content || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.means) {
+                  <div class="dp-block">
+                    <div class="dp-label">Inputs / means (EN)</div>
+                    @if (canEditTranslation()) {
+                      <textarea rows="3" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                                [value]="translationDraft().means ?? ''"
+                                (input)="setTrans('means', $any($event.target).value)"
+                                placeholder="Inputs / means in English…"></textarea>
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.means || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.output) {
+                  <div class="dp-block">
+                    <div class="dp-label">Outputs (EN)</div>
+                    @if (canEditTranslation()) {
+                      <textarea rows="3" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                                [value]="translationDraft().output ?? ''"
+                                (input)="setTrans('output', $any($event.target).value)"
+                                placeholder="Outputs in English…"></textarea>
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.output || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.verificationMethod) {
+                  <div class="dp-block">
+                    <div class="dp-label">Verification method (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().verificationMethod ?? ''"
+                             (input)="setTrans('verificationMethod', $any($event.target).value)"
+                             placeholder="Verification method in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.verificationMethod || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.targetValue) {
+                  <div class="dp-block">
+                    <div class="dp-label">Target value (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().targetValue ?? ''"
+                             (input)="setTrans('targetValue', $any($event.target).value)"
+                             placeholder="Target value in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.targetValue || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.baseline) {
+                  <div class="dp-block">
+                    <div class="dp-label">Baseline (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().baseline ?? ''"
+                             (input)="setTrans('baseline', $any($event.target).value)"
+                             placeholder="Baseline in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.baseline || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.dataSource) {
+                  <div class="dp-block">
+                    <div class="dp-label">Data source (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().dataSource ?? ''"
+                             (input)="setTrans('dataSource', $any($event.target).value)"
+                             placeholder="Data source in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.dataSource || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.frequency) {
+                  <div class="dp-block">
+                    <div class="dp-label">Frequency (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().frequency ?? ''"
+                             (input)="setTrans('frequency', $any($event.target).value)"
+                             placeholder="Frequency in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.frequency || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.deliverable) {
+                  <div class="dp-block">
+                    <div class="dp-label">Deliverable (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().deliverable ?? ''"
+                             (input)="setTrans('deliverable', $any($event.target).value)"
+                             placeholder="Deliverable in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.deliverable || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.likelihood) {
+                  <div class="dp-block">
+                    <div class="dp-label">Likelihood (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().likelihood ?? ''"
+                             (input)="setTrans('likelihood', $any($event.target).value)"
+                             placeholder="Likelihood in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.likelihood || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.impact) {
+                  <div class="dp-block">
+                    <div class="dp-label">Impact (EN)</div>
+                    @if (canEditTranslation()) {
+                      <input style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                             [value]="translationDraft().impact ?? ''"
+                             (input)="setTrans('impact', $any($event.target).value)"
+                             placeholder="Impact in English…" />
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.impact || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (selectedRow()!.mitigation) {
+                  <div class="dp-block">
+                    <div class="dp-label">Mitigation measure (EN)</div>
+                    @if (canEditTranslation()) {
+                      <textarea rows="3" style="width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                                [value]="translationDraft().mitigation ?? ''"
+                                (input)="setTrans('mitigation', $any($event.target).value)"
+                                placeholder="Mitigation measure in English…"></textarea>
+                    } @else {
+                      <div class="dp-text">{{ selectedRow()!.translation?.mitigation || '—' }}</div>
+                    }
+                  </div>
+                }
+
+                @if (canEditTranslation()) {
+                  <div style="display:flex; justify-content:flex-end; padding-top:8px">
+                    <button mat-raised-button color="primary" [disabled]="savingTranslation()" (click)="saveTranslation()">
+                      @if (savingTranslation()) {
+                        <mat-spinner diameter="18" style="margin:auto"></mat-spinner>
+                      } @else {
+                        <ng-container><mat-icon>save</mat-icon> Save EN</ng-container>
+                      }
+                    </button>
+                  </div>
+                }
+              </div>
+              } <!-- end tabLang === en -->
 
               <!-- Pied : actions PMO -->
               <div class="dp-footer">
@@ -700,6 +941,10 @@ export class ConsolidationComponent implements OnInit {
   rowHeights = signal<Record<string, number>>({});
 
   selectedRow = signal<Input | null>(null);
+  tabLang = signal<'fr' | 'en'>('fr');
+  translationDraft = signal<Partial<InputTranslation>>({});
+  savingTranslation = signal(false);
+  translating = signal(false);
 
   cw = {
     section: signal(140),
@@ -710,10 +955,24 @@ export class ConsolidationComponent implements OnInit {
     actions: signal(180),
   };
 
+  canEditTranslation = computed(() => {
+    const row = this.selectedRow();
+    if (!row) return false;
+    if (this.auth.isSuperAdmin() || this.auth.isPmo() || this.auth.isCop()) return true;
+    return row.status === 'draft' && row.authorUserId === this.auth.currentUser()?.id;
+  });
+
   constructor() {
     effect(() => {
       this.filterSection(); this.filterStatus(); this.filterType(); this.filterEntity();
       untracked(() => this.pageIndex.set(0));
+    });
+    effect(() => {
+      const row = this.selectedRow();
+      untracked(() => {
+        this.tabLang.set('fr');
+        this.translationDraft.set(row?.translation ? { ...row.translation } : {});
+      });
     });
   }
 
@@ -847,18 +1106,58 @@ export class ConsolidationComponent implements OnInit {
 
   // ── Exports ──────────────────────────────────────────────────────────────────
 
-  downloadGlobalDocx() {
+  setTrans(field: string, value: string) {
+    this.translationDraft.update(d => ({ ...d, [field]: value }));
+  }
+
+  autoTranslate() {
+    const row = this.selectedRow();
+    if (!row) return;
+    this.translating.set(true);
+    this.inputsService.autoTranslate(row.id).subscribe({
+      next: (t) => {
+        this.translating.set(false);
+        this.translationDraft.set({ ...t });
+        this.updateLocal({ ...row, translation: t } as any);
+        this.snackBar.open('Traduction EN générée', 'OK', { duration: 2500 });
+      },
+      error: (e) => {
+        this.translating.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur LLM', 'Fermer', { duration: 5000 });
+      },
+    });
+  }
+
+  saveTranslation() {
+    const row = this.selectedRow();
+    if (!row) return;
+    this.savingTranslation.set(true);
+    const payload: TranslationPayload = { ...this.translationDraft() };
+    this.inputsService.upsertTranslation(row.id, payload).subscribe({
+      next: (t) => {
+        this.savingTranslation.set(false);
+        this.updateLocal({ ...row, translation: t } as any);
+        this.snackBar.open('Traduction EN enregistrée', 'OK', { duration: 2000 });
+      },
+      error: (e) => {
+        this.savingTranslation.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur', 'Fermer', { duration: 4000 });
+      },
+    });
+  }
+
+  downloadGlobalDocx(lang: 'fr' | 'en' = 'fr') {
     this.downloading.set(true);
-    this.inputsService.downloadDocx().subscribe({
-      next: (blob) => { this.triggerDownload(blob, `collecte-global-${Date.now()}.docx`); this.downloading.set(false); },
+    this.inputsService.downloadDocx(undefined, lang).subscribe({
+      next: (blob) => { this.triggerDownload(blob, `collecte-global-${lang}-${Date.now()}.docx`); this.downloading.set(false); },
       error: (e) => { this.snackBar.open(e.error?.message ?? 'Erreur export', 'Fermer', { duration: 4000 }); this.downloading.set(false); },
     });
   }
 
-  downloadGlobalXlsx() {
+  downloadGlobalXlsx(lang: 'fr' | 'en' = 'fr') {
     this.downloading.set(true);
-    this.inputsService.downloadXlsx().subscribe({
-      next: (blob) => { this.triggerDownload(blob, `collecte-global-${Date.now()}.xlsx`); this.downloading.set(false); },
+    this.inputsService.downloadXlsx(undefined, lang).subscribe({
+      next: (blob) => { this.triggerDownload(blob, `collecte-global-${lang}-${Date.now()}.xlsx`); this.downloading.set(false); },
       error: (e) => { this.snackBar.open(e.error?.message ?? 'Erreur export', 'Fermer', { duration: 4000 }); this.downloading.set(false); },
     });
   }

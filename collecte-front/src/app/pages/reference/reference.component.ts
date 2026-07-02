@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, computed } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
@@ -65,52 +65,63 @@ const CONTRIBUTION_ICONS: Record<string, string> = {
         </mat-card>
       }
 
-      <mat-accordion multi>
-        @for (section of sections(); track section.id) {
-          <mat-expansion-panel>
-            <mat-expansion-panel-header>
-              <mat-panel-title style="font-weight:500; font-size:15px">
-                {{ section.titre }}
-              </mat-panel-title>
-              <mat-panel-description style="display:flex; align-items:center; gap:8px">
-                <span class="section-badge">{{ OBJECTIF_LABELS[section.objectif] }}</span>
-                <mat-chip [class]="'contribution-' + section.contributionMode" style="font-size:11px; min-height:22px">
-                  <mat-icon style="font-size:14px; margin-right:4px">{{ CONTRIBUTION_ICONS[section.contributionMode] }}</mat-icon>
-                  {{ CONTRIBUTION_LABELS[section.contributionMode] }}
-                </mat-chip>
-                @if ((section._count?.inputs ?? 0) > 0) {
-                  <span style="font-size:12px; color:#1565c0; font-weight:600">
-                    {{ section._count?.inputs }} input(s)
-                  </span>
-                }
-              </mat-panel-description>
-            </mat-expansion-panel-header>
+      @for (part of parts(); track part.partNumber) {
+        <div style="margin-bottom:8px">
+          <h2 style="font-size:14px; font-weight:700; color:#1565c0; margin:20px 0 6px; display:flex; align-items:center; gap:10px">
+            <span style="background:#1565c0; color:#fff; border-radius:50%; width:26px; height:26px; flex-shrink:0;
+                         display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700">
+              {{ part.partNumber }}
+            </span>
+            {{ part.partTitle }}
+          </h2>
+          <mat-accordion multi>
+            @for (section of part.sections; track section.id) {
+              <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                  <mat-panel-title style="font-weight:500; font-size:15px">
+                    {{ section.titre }}
+                  </mat-panel-title>
+                  <mat-panel-description style="display:flex; align-items:center; gap:8px">
+                    <span class="section-badge">{{ OBJECTIF_LABELS[section.objectif] }}</span>
+                    <mat-chip [class]="'contribution-' + section.contributionMode" style="font-size:11px; min-height:22px">
+                      <mat-icon style="font-size:14px; margin-right:4px">{{ CONTRIBUTION_ICONS[section.contributionMode] }}</mat-icon>
+                      {{ CONTRIBUTION_LABELS[section.contributionMode] }}
+                    </mat-chip>
+                    @if ((section._count?.inputs ?? 0) > 0) {
+                      <span style="font-size:12px; color:#1565c0; font-weight:600">
+                        {{ section._count?.inputs }} input(s)
+                      </span>
+                    }
+                  </mat-panel-description>
+                </mat-expansion-panel-header>
 
-            <div style="padding:8px 0">
-              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
-                <span style="font-size:12px; color:#666">
-                  <strong>NOFO :</strong> {{ section.rubriqueNofo }}
-                </span>
-                @if (section.entites.length > 0) {
-                  <span style="font-size:12px; color:#666">
-                    <strong>Entités :</strong> {{ section.entites.join(', ') }}
-                  </span>
-                }
-              </div>
+                <div style="padding:8px 0">
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px">
+                    <span style="font-size:12px; color:#666">
+                      <strong>NOFO :</strong> {{ section.rubriqueNofo }}
+                    </span>
+                    @if (section.entites.length > 0) {
+                      <span style="font-size:12px; color:#666">
+                        <strong>Entités :</strong> {{ section.entites.join(', ') }}
+                      </span>
+                    }
+                  </div>
 
-              <div class="reference-text" [innerHTML]="section.texteReference | markdown"></div>
+                  <div class="reference-text" [innerHTML]="section.texteReference | markdown"></div>
 
-              @if (section.contributionMode !== 'lecture_seule') {
-                <div style="margin-top:12px; text-align:right">
-                  <a mat-stroked-button color="primary" [routerLink]="['/contribute', section.id]">
-                    <mat-icon>edit_note</mat-icon> Contribuer sur cet axe
-                  </a>
+                  @if (section.contributionMode !== 'lecture_seule') {
+                    <div style="margin-top:12px; text-align:right">
+                      <a mat-stroked-button color="primary" [routerLink]="['/contribute', section.id]">
+                        <mat-icon>edit_note</mat-icon> Contribuer sur cet axe
+                      </a>
+                    </div>
+                  }
                 </div>
-              }
-            </div>
-          </mat-expansion-panel>
-        }
-      </mat-accordion>
+              </mat-expansion-panel>
+            }
+          </mat-accordion>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -130,6 +141,19 @@ export class ReferenceComponent implements OnInit {
   readonly OBJECTIF_LABELS = OBJECTIF_LABELS;
   readonly CONTRIBUTION_LABELS = CONTRIBUTION_LABELS;
   readonly CONTRIBUTION_ICONS = CONTRIBUTION_ICONS;
+
+  parts = computed(() => {
+    const map = new Map<number, { partNumber: number; partTitle: string; sections: ReferenceSection[] }>();
+    for (const s of this.sections()) {
+      const pn = s.partNumber ?? 0;
+      const pt = s.partTitle ?? 'Général';
+      if (!map.has(pn)) map.set(pn, { partNumber: pn, partTitle: pt, sections: [] });
+      map.get(pn)!.sections.push(s);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([, v]) => v);
+  });
 
   ngOnInit() {
     this.sectionsService.getAll().subscribe({

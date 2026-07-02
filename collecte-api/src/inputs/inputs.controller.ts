@@ -5,7 +5,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InputsService } from './inputs.service';
 import { CreateInputDto } from './dto/create-input.dto';
-import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto } from './dto/update-input.dto';
+import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto, UpsertTranslationDto } from './dto/update-input.dto';
 
 @Controller('inputs')
 @UseGuards(JwtAuthGuard)
@@ -68,6 +68,16 @@ export class InputsController {
   @Patch(':id/pmo')
   updatePmo(@Param('id') id: string, @Body() dto: UpdatePmoDto, @Request() req: any) {
     return this.inputsService.updatePmo(id, dto, req.user);
+  }
+
+  @Patch(':id/translation')
+  upsertTranslation(@Param('id') id: string, @Body() dto: UpsertTranslationDto, @Request() req: any) {
+    return this.inputsService.upsertTranslation(id, dto, req.user);
+  }
+
+  @Post(':id/translation/auto')
+  autoTranslate(@Param('id') id: string, @Request() req: any) {
+    return this.inputsService.autoTranslate(id, req.user);
   }
 
   @Patch(':id/restore')

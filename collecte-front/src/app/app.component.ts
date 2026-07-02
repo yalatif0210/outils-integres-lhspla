@@ -29,6 +29,14 @@ import { environment } from '../environments/environment';
       <a mat-button routerLink="/consolidation" routerLinkActive="active-nav">
         <mat-icon>dashboard</mat-icon> Consolidation
       </a>
+      @if (auth.isSuperAdmin()) {
+        <a mat-button routerLink="/trash" routerLinkActive="active-nav" matTooltip="Corbeille (Super Admin)">
+          <mat-icon>delete_sweep</mat-icon>
+        </a>
+      }
+      <a mat-button routerLink="/aide" routerLinkActive="active-nav" matTooltip="Aide">
+        <mat-icon>help_outline</mat-icon>
+      </a>
 
       <span style="margin: 0 12px; opacity:.5">|</span>
 
