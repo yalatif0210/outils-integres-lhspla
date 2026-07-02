@@ -26,8 +26,8 @@ const TYPE_LABELS: Record<string, string> = {
   milestone: 'Jalon', comment: 'Commentaire', risk: 'Risque',
 };
 
-type ColKey = 'section' | 'entity' | 'type' | 'content' | 'status' | 'actions';
-const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', 'actions'];
+type ColKey = 'section' | 'entity' | 'type' | 'content' | 'comments' | 'status' | 'actions';
+const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'comments', 'status', 'actions'];
 
 @Component({
   selector: 'app-consolidation',
@@ -154,6 +154,7 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                     <col [style.width.px]="cw.entity()">
                     <col [style.width.px]="cw.type()">
                     <col [style.width.px]="cw.content()">
+                    <col [style.width.px]="cw.comments()">
                     <col [style.width.px]="cw.status()">
                     <col [style.width.px]="cw.actions()">
                   </colgroup>
@@ -163,6 +164,7 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                       <th><span>Entité</span><div class="rh" (mousedown)="startResize($event,'entity')"></div></th>
                       <th><span>Type</span><div class="rh" (mousedown)="startResize($event,'type')"></div></th>
                       <th><span>Contribution</span><div class="rh" (mousedown)="startResize($event,'content')"></div></th>
+                      <th><span>Commentaires</span><div class="rh" (mousedown)="startResize($event,'comments')"></div></th>
                       <th><span>Statut</span><div class="rh" (mousedown)="startResize($event,'status')"></div></th>
                       <th><span>Actions PMO</span></th>
                     </tr>
@@ -170,7 +172,7 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                   <tbody>
                     @if (paginated().length === 0) {
                       <tr>
-                        <td colspan="6" style="text-align:center; padding:40px; color:#999">
+                        <td colspan="7" style="text-align:center; padding:40px; color:#999">
                           <mat-icon style="font-size:36px; display:block; margin-bottom:8px">inbox</mat-icon>
                           Aucun input avec ces filtres
                         </td>
@@ -217,6 +219,22 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'status', '
                           <div style="font-size:11px; color:#888; margin-top:4px">
                             {{ row.author.email }} · {{ row.updatedAt | date:'dd/MM/yyyy HH:mm' }}
                           </div>
+                        </td>
+
+                        <!-- Commentaires -->
+                        <td class="td-content" (click)="$event.stopPropagation()">
+                          @if (commentsFor(row.id).length === 0) {
+                            <span style="color:#ccc; font-size:12px">—</span>
+                          } @else {
+                            @for (c of commentsFor(row.id); track c.id) {
+                              <div style="font-size:11px; border-left:3px solid #90caf9; padding:3px 6px; margin-bottom:6px; background:#f5f9ff; border-radius:0 4px 4px 0">
+                                <div style="font-weight:600; color:#1565c0; margin-bottom:2px">
+                                  {{ c.entity.code }} · {{ c.author.email }}
+                                </div>
+                                <div style="color:#444; word-break:break-word; white-space:normal">{{ preview(c.content) }}</div>
+                              </div>
+                            }
+                          }
                         </td>
 
                         <!-- Statut -->
@@ -950,7 +968,8 @@ export class ConsolidationComponent implements OnInit {
     section: signal(140),
     entity: signal(80),
     type: signal(100),
-    content: signal(380),
+    content: signal(320),
+    comments: signal(200),
     status: signal(90),
     actions: signal(180),
   };
@@ -1010,6 +1029,22 @@ export class ConsolidationComponent implements OnInit {
     }
     return Array.from(counts.entries()).map(([code, total]) => ({ code, total }));
   });
+
+  commentsByRef = computed(() => {
+    const map = new Map<string, Input[]>();
+    for (const inp of this.allInputs()) {
+      if (inp.type === 'comment' && inp.targetRef) {
+        const list = map.get(inp.targetRef) ?? [];
+        list.push(inp);
+        map.set(inp.targetRef, list);
+      }
+    }
+    return map;
+  });
+
+  commentsFor(id: string): Input[] {
+    return this.commentsByRef().get(id) ?? [];
+  }
 
   ngOnInit() {
     this.sectionsService.getAll().subscribe(s => this.sections.set(s));
