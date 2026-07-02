@@ -135,9 +135,32 @@ const QUILL_MODULES = {
                       }
                       @if (inp.authorUserId !== auth.currentUser()?.id && allowedTypes().includes('comment')) {
                         <button mat-stroked-button color="accent" style="margin-top:6px; font-size:12px"
-                                (click)="commentOn(inp)">
-                          <mat-icon>chat</mat-icon> Commenter
+                                (click)="toggleCommentBox(inp)">
+                          <mat-icon>{{ commentingOnId() === inp.id ? 'close' : 'chat' }}</mat-icon>
+                          {{ commentingOnId() === inp.id ? 'Annuler' : 'Commenter' }}
                         </button>
+                        @if (commentingOnId() === inp.id) {
+                          <div style="margin-top:8px; display:flex; flex-direction:column; gap:8px">
+                            <textarea
+                              rows="3"
+                              placeholder="Votre commentaire..."
+                              [value]="inlineCommentText()"
+                              (input)="inlineCommentText.set($any($event.target).value)"
+                              style="width:100%; box-sizing:border-box; border:1px solid #bdbdbd; border-radius:4px; padding:8px; font-size:13px; font-family:inherit; resize:vertical; outline:none">
+                            </textarea>
+                            <div style="display:flex; gap:8px">
+                              <button mat-flat-button color="accent"
+                                      [disabled]="!inlineCommentText().trim() || submittingInlineComment()"
+                                      (click)="submitInlineComment(inp)">
+                                @if (submittingInlineComment()) {
+                                  <mat-spinner diameter="16" style="display:inline-block"></mat-spinner>
+                                } @else {
+                                  <ng-container><mat-icon>send</mat-icon> Envoyer</ng-container>
+                                }
+                              </button>
+                            </div>
+                          </div>
+                        }
                       }
                     </div>
                   }
@@ -524,6 +547,10 @@ export class ContributeComponent implements OnInit, OnDestroy {
   savingTranslation = signal(false);
   translating = signal(false);
 
+  commentingOnId = signal<string | null>(null);
+  inlineCommentText = signal('');
+  submittingInlineComment = signal(false);
+
   selectedSectionId = '';
 
   readonly TYPE_LABELS = TYPE_LABELS;
@@ -797,16 +824,52 @@ export class ContributeComponent implements OnInit, OnDestroy {
     };
   }
 
-  commentOn(inp: Input) {
-    this._draftId.set(null);
-    this.isSaving = false;
-    this.autosaveLabel.set('');
-    this.translationDraft.set({});
-    this.form.reset({
+  toggleCommentBox(inp: Input) {
+    if (this.commentingOnId() === inp.id) {
+      this.commentingOnId.set(null);
+      this.inlineCommentText.set('');
+    } else {
+      this.commentingOnId.set(inp.id);
+      this.inlineCommentText.set('');
+    }
+  }
+
+  cancelInlineComment() {
+    this.commentingOnId.set(null);
+    this.inlineCommentText.set('');
+  }
+
+  submitInlineComment(inp: Input) {
+    const text = this.inlineCommentText().trim();
+    if (!text || this.submittingInlineComment()) return;
+    this.submittingInlineComment.set(true);
+
+    this.inputsService.create({
+      referenceSectionId: this.selectedSectionId,
       type: 'comment',
+      content: text,
       targetRef: inp.id,
-    }, { emitEvent: false });
-    this.snackBar.open(`Vous commentez la contribution de ${inp.author.email}`, 'OK', { duration: 2500 });
+    }).subscribe({
+      next: (created) => {
+        this.inputsService.updateStatus(created.id, 'submitted').subscribe({
+          next: () => {
+            this.submittingInlineComment.set(false);
+            this.commentingOnId.set(null);
+            this.inlineCommentText.set('');
+            this.snackBar.open('Commentaire soumis', 'OK', { duration: 2500 });
+            this.loadExistingInputs(this.selectedSectionId);
+          },
+          error: (e) => {
+            this.submittingInlineComment.set(false);
+            this.snackBar.open(e.error?.message ?? 'Erreur lors de la soumission', 'Fermer', { duration: 4000 });
+          },
+        });
+      },
+      error: (e) => {
+        this.submittingInlineComment.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur lors de la création', 'Fermer', { duration: 4000 });
+      },
+    });
   }
 
   resetForm() {
