@@ -9,7 +9,7 @@ export class SectionsService {
     return this.prisma.referenceSection.findMany({
       orderBy: { ordre: 'asc' },
       include: {
-        _count: { select: { inputs: true } },
+        _count: { select: { inputs: { where: { deletedAt: null } as any } } },
       },
     });
   }
@@ -19,6 +19,7 @@ export class SectionsService {
       where: { id },
       include: {
         inputs: {
+          where: { deletedAt: null } as any,
           include: {
             author: true,
             entity: true,

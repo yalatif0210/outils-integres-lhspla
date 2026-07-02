@@ -5,6 +5,29 @@ import { environment } from '../../environments/environment';
 export type InputType = 'activity' | 'indicator' | 'milestone' | 'comment' | 'risk';
 export type InputStatus = 'draft' | 'submitted' | 'retained' | 'rejected';
 
+export interface InputTranslation {
+  id: string;
+  inputId: string;
+  title?: string | null;
+  content?: string | null;
+  means?: string | null;
+  output?: string | null;
+  verificationMethod?: string | null;
+  targetValue?: string | null;
+  dueMonth?: string | null;
+  objective?: string | null;
+  sourceRef?: string | null;
+  deliverable?: string | null;
+  baseline?: string | null;
+  dataSource?: string | null;
+  frequency?: string | null;
+  likelihood?: string | null;
+  impact?: string | null;
+  mitigation?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Input {
   id: string;
   referenceSectionId: string;
@@ -38,6 +61,7 @@ export interface Input {
   entity: { id: string; code: string; label: string };
   referenceSection?: { id: string; titre: string };
   revisions?: any[];
+  translation?: InputTranslation | null;
 }
 
 export interface CreateInputPayload {
@@ -62,6 +86,8 @@ export interface CreateInputPayload {
   mitigation?: string;
   targetRef?: string;
 }
+
+export type TranslationPayload = Partial<Omit<InputTranslation, 'id' | 'inputId' | 'createdAt' | 'updatedAt'>>;
 
 @Injectable({ providedIn: 'root' })
 export class InputsService {
@@ -113,6 +139,14 @@ export class InputsService {
     return this.http.patch<Input>(`${this.base}/${id}/pmo`, payload);
   }
 
+  upsertTranslation(id: string, payload: TranslationPayload) {
+    return this.http.patch<InputTranslation>(`${this.base}/${id}/translation`, payload);
+  }
+
+  autoTranslate(id: string) {
+    return this.http.post<InputTranslation>(`${this.base}/${id}/translation/auto`, {});
+  }
+
   restore(id: string) {
     return this.http.patch<Input>(`${this.base}/${id}/restore`, {});
   }
@@ -121,17 +155,19 @@ export class InputsService {
     return this.http.delete(`${this.base}/${id}`);
   }
 
-  downloadDocx(sectionId?: string) {
+  downloadDocx(sectionId?: string, lang: 'fr' | 'en' = 'fr') {
     const url = sectionId
       ? `${environment.apiUrl}/export/section/${sectionId}/docx`
       : `${environment.apiUrl}/export/global/docx`;
-    return this.http.get(url, { responseType: 'blob' });
+    const params = new HttpParams().set('lang', lang);
+    return this.http.get(url, { responseType: 'blob', params });
   }
 
-  downloadXlsx(sectionId?: string) {
+  downloadXlsx(sectionId?: string, lang: 'fr' | 'en' = 'fr') {
     const url = sectionId
       ? `${environment.apiUrl}/export/section/${sectionId}/xlsx`
       : `${environment.apiUrl}/export/global/xlsx`;
-    return this.http.get(url, { responseType: 'blob' });
+    const params = new HttpParams().set('lang', lang);
+    return this.http.get(url, { responseType: 'blob', params });
   }
 }

@@ -27,6 +27,8 @@ model ReferenceSection {
   contributionMode String   @default("lecture_seule")
   inputTypes       String[] @default([])
   texteReference   String
+  partNumber       Int?
+  partTitle        String?
 
   inputs Input[]
 
@@ -93,7 +95,8 @@ model Input {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  revisions InputRevision[]
+  revisions   InputRevision[]
+  translation InputTranslation?
 
   @@map("input")
 }
@@ -111,6 +114,34 @@ enum InputStatus {
   submitted
   retained
   rejected
+}
+
+model InputTranslation {
+  id      String @id @default(uuid())
+  inputId String @unique
+  input   Input  @relation(fields: [inputId], references: [id], onDelete: Cascade)
+
+  title              String?
+  content            String?
+  means              String?
+  output             String?
+  verificationMethod String?
+  targetValue        String?
+  dueMonth           String?
+  objective          String?
+  sourceRef          String?
+  deliverable        String?
+  baseline           String?
+  dataSource         String?
+  frequency          String?
+  likelihood         String?
+  impact             String?
+  mitigation         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("input_translation")
 }
 
 model InputRevision {

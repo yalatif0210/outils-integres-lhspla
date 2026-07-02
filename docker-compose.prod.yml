@@ -78,6 +78,8 @@ services:
       JWT_ENTITY_CLAIM: entityCode
       PORT:         3001
       COLLECTE_FRONT_URL: https://vps.lhspla-ci.org
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      MISTRAL_API_KEY:   ${MISTRAL_API_KEY}
     depends_on:
       prod-db:
         condition: service_healthy

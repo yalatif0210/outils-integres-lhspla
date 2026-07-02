@@ -11,7 +11,7 @@ import { InputsService, Input, InputType, InputStatus } from '../../services/inp
 import { AuthService } from '../../services/auth.service';
 
 const TYPE_LABELS: Record<InputType, string> = {
-  activity: 'Activite', indicator: 'Indicateur',
+  activity: 'Activité', indicator: 'Indicateur',
   milestone: 'Jalon', comment: 'Commentaire', risk: 'Risque',
 };
 const STATUS_LABELS: Record<InputStatus, string> = {

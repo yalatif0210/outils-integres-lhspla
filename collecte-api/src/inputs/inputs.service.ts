@@ -3,7 +3,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInputDto } from './dto/create-input.dto';
-import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto } from './dto/update-input.dto';
+import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto, UpsertTranslationDto } from './dto/update-input.dto';
+import { TranslationLlmService } from '../translation/translation-llm.service';
 
 const INPUT_INCLUDE = {
   author: { select: { id: true, email: true, entityId: true } },
@@ -13,7 +14,8 @@ const INPUT_INCLUDE = {
     orderBy: { createdAt: 'desc' as const },
     include: { editor: { select: { id: true, email: true } } },
   },
-} as const;
+  translation: true,
+};
 
 type AuthUser = { userId: string; roles: string[]; entityCode: string | null; entityId: string | null };
 
@@ -22,6 +24,9 @@ function isSuperAdmin(user: Pick<AuthUser, 'roles'>): boolean {
 }
 function isPmo(user: Pick<AuthUser, 'entityCode'>): boolean {
   return user.entityCode === 'PMO';
+}
+function isCop(user: Pick<AuthUser, 'roles'>): boolean {
+  return Array.isArray(user.roles) && user.roles.includes('chief_of_party');
 }
 
 function buildInputData(dto: Partial<CreateInputDto>) {
@@ -76,7 +81,10 @@ function validateTypeRequiredFields(type: string, dto: Partial<CreateInputDto>):
 
 @Injectable()
 export class InputsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private translationLlm: TranslationLlmService,
+  ) {}
 
   async findAll(filters: {
     sectionId?: string; entityId?: string; type?: string; status?: string;
@@ -187,14 +195,32 @@ export class InputsService {
       include: INPUT_INCLUDE,
     });
 
-    await this.prisma.inputRevision.create({
-      data: {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const recentRevision = await this.prisma.inputRevision.findFirst({
+      where: {
         inputId: id,
         editorUserId: user.userId,
         changeType: 'updated',
-        snapshot: { before: existing, after: updated } as any,
-      },
+        createdAt: { gte: thirtyMinutesAgo },
+      } as any,
+      orderBy: { createdAt: 'desc' },
     });
+
+    if (recentRevision) {
+      await this.prisma.inputRevision.update({
+        where: { id: recentRevision.id },
+        data: { snapshot: { before: existing, after: updated } as any },
+      });
+    } else {
+      await this.prisma.inputRevision.create({
+        data: {
+          inputId: id,
+          editorUserId: user.userId,
+          changeType: 'updated',
+          snapshot: { before: existing, after: updated } as any,
+        },
+      });
+    }
 
     return updated;
   }
@@ -330,6 +356,88 @@ export class InputsService {
     });
 
     return restored;
+  }
+
+  async upsertTranslation(id: string, dto: UpsertTranslationDto, user: AuthUser) {
+    const existing = await this.findOne(id);
+    const sa = isSuperAdmin(user);
+    const pmo = isPmo(user);
+    const cop = isCop(user);
+
+    if (!sa && !pmo && !cop) {
+      if (existing.status !== 'draft') {
+        throw new ForbiddenException('La traduction EN ne peut être modifiée que pour un brouillon.');
+      }
+      if (existing.authorUserId !== user.userId) {
+        throw new ForbiddenException('Vous ne pouvez modifier que la traduction de vos propres inputs.');
+      }
+    }
+
+    const data = {
+      ...(dto.title !== undefined && { title: dto.title }),
+      ...(dto.content !== undefined && { content: dto.content }),
+      ...(dto.means !== undefined && { means: dto.means }),
+      ...(dto.output !== undefined && { output: dto.output }),
+      ...(dto.verificationMethod !== undefined && { verificationMethod: dto.verificationMethod }),
+      ...(dto.targetValue !== undefined && { targetValue: dto.targetValue }),
+      ...(dto.dueMonth !== undefined && { dueMonth: dto.dueMonth }),
+      ...(dto.objective !== undefined && { objective: dto.objective }),
+      ...(dto.sourceRef !== undefined && { sourceRef: dto.sourceRef }),
+      ...(dto.deliverable !== undefined && { deliverable: dto.deliverable }),
+      ...(dto.baseline !== undefined && { baseline: dto.baseline }),
+      ...(dto.dataSource !== undefined && { dataSource: dto.dataSource }),
+      ...(dto.frequency !== undefined && { frequency: dto.frequency }),
+      ...(dto.likelihood !== undefined && { likelihood: dto.likelihood }),
+      ...(dto.impact !== undefined && { impact: dto.impact }),
+      ...(dto.mitigation !== undefined && { mitigation: dto.mitigation }),
+    };
+
+    return (this.prisma as any).inputTranslation.upsert({
+      where: { inputId: id },
+      create: { inputId: id, ...data },
+      update: data,
+    });
+  }
+
+  async autoTranslate(id: string, user: AuthUser) {
+    const existing = await this.findOne(id);
+    const sa = isSuperAdmin(user);
+    const pmo = isPmo(user);
+    const cop = isCop(user);
+
+    if (!sa && !pmo && !cop) {
+      if (existing.status !== 'draft') {
+        throw new ForbiddenException('La traduction EN ne peut être générée que pour un brouillon.');
+      }
+      if (existing.authorUserId !== user.userId) {
+        throw new ForbiddenException('Vous ne pouvez traduire que vos propres inputs.');
+      }
+    }
+
+    const translated = await this.translationLlm.translate({
+      title: (existing as any).title,
+      content: (existing as any).content,
+      means: (existing as any).means,
+      output: (existing as any).output,
+      verificationMethod: (existing as any).verificationMethod,
+      targetValue: (existing as any).targetValue,
+      dueMonth: (existing as any).dueMonth,
+      objective: (existing as any).objective,
+      sourceRef: (existing as any).sourceRef,
+      deliverable: (existing as any).deliverable,
+      baseline: (existing as any).baseline,
+      dataSource: (existing as any).dataSource,
+      frequency: (existing as any).frequency,
+      likelihood: (existing as any).likelihood,
+      impact: (existing as any).impact,
+      mitigation: (existing as any).mitigation,
+    });
+
+    return (this.prisma as any).inputTranslation.upsert({
+      where: { inputId: id },
+      create: { inputId: id, ...translated },
+      update: translated,
+    });
   }
 
   async getStats() {

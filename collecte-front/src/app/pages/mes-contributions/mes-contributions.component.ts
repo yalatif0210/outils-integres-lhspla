@@ -18,7 +18,7 @@ import { SectionsService } from '../../services/sections.service';
 import { AuthService } from '../../services/auth.service';
 
 const TYPE_LABELS: Record<InputType, string> = {
-  activity: 'Activite', indicator: 'Indicateur',
+  activity: 'Activité', indicator: 'Indicateur',
   milestone: 'Jalon', comment: 'Commentaire', risk: 'Risque',
 };
 
@@ -85,7 +85,7 @@ const STATUS_LABELS: Record<InputStatus, string> = {
             <mat-label>Type</mat-label>
             <mat-select [(ngModel)]="filterType">
               <mat-option value="">Tous</mat-option>
-              <mat-option value="activity">Activite</mat-option>
+              <mat-option value="activity">Activité</mat-option>
               <mat-option value="indicator">Indicateur</mat-option>
               <mat-option value="milestone">Jalon</mat-option>
               <mat-option value="comment">Commentaire</mat-option>

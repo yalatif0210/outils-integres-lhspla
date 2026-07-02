@@ -24,6 +24,27 @@ function normalizeEntityCode(code: string): string {
   return code === 'S&E' ? 'SE' : code;
 }
 
+const PART_BY_SECTION: Record<string, { partNumber: number; partTitle: string }> = {
+  'proposal-summary':          { partNumber: 1,  partTitle: 'Résumé de la proposition' },
+  'introduction-organisation': { partNumber: 2,  partTitle: "Présentation de l'organisation" },
+  'problem-statement':         { partNumber: 3,  partTitle: 'Exposé du problème' },
+  'objectif-1':                { partNumber: 4,  partTitle: 'But et Objectifs' },
+  'objectif-2':                { partNumber: 4,  partTitle: 'But et Objectifs' },
+  'objectif-3':                { partNumber: 4,  partTitle: 'But et Objectifs' },
+  'objectif-4':                { partNumber: 4,  partTitle: 'But et Objectifs' },
+  'activites-5-1':             { partNumber: 5,  partTitle: 'Activités du projet' },
+  'activites-5-2':             { partNumber: 5,  partTitle: 'Activités du projet' },
+  'activites-5-3':             { partNumber: 5,  partTitle: 'Activités du projet' },
+  'activites-5-4':             { partNumber: 5,  partTitle: 'Activités du projet' },
+  'activites-5-5':             { partNumber: 5,  partTitle: 'Activités du projet' },
+  'methods-design':            { partNumber: 6,  partTitle: 'Méthodes et conception' },
+  'milestone-plan':            { partNumber: 7,  partTitle: 'Plan des étapes clés' },
+  'monitoring-evaluation':     { partNumber: 8,  partTitle: 'Suivi & Évaluation' },
+  'sustainability':            { partNumber: 9,  partTitle: 'Financement futur et durabilité' },
+  'project-partners':          { partNumber: 10, partTitle: 'Partenaires du projet' },
+  'risk-security':             { partNumber: 11, partTitle: 'Analyse des risques et sécurité' },
+};
+
 const INPUT_TYPES_BY_SECTION: Record<string, string[]> = {
   'proposal-summary':       [],
   'introduction-organisation': [],
@@ -354,6 +375,7 @@ async function main() {
   for (const s of SECTIONS) {
     const entites = s.entites.map(normalizeEntityCode);
     const inputTypes = INPUT_TYPES_BY_SECTION[s.id] ?? [];
+    const part = PART_BY_SECTION[s.id];
     await (prisma.referenceSection as any).upsert({
       where: { id: s.id },
       update: {
@@ -365,6 +387,8 @@ async function main() {
         contributionMode: s.contributionMode,
         inputTypes,
         texteReference: s.texteReference,
+        partNumber: part?.partNumber ?? null,
+        partTitle: part?.partTitle ?? null,
       },
       create: {
         id: s.id,
@@ -376,6 +400,8 @@ async function main() {
         contributionMode: s.contributionMode,
         inputTypes,
         texteReference: s.texteReference,
+        partNumber: part?.partNumber ?? null,
+        partTitle: part?.partTitle ?? null,
       },
     });
   }

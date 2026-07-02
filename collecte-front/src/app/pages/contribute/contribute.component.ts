@@ -1,5 +1,5 @@
 import {
-  Component, inject, signal, OnInit, OnDestroy, computed,
+  Component, inject, signal, OnInit, OnDestroy, computed, HostListener,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -17,7 +17,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { QuillEditorComponent } from 'ngx-quill';
 import { SectionsService, ReferenceSection } from '../../services/sections.service';
-import { InputsService, Input, InputType, InputStatus } from '../../services/inputs.service';
+import { InputsService, Input, InputType, InputStatus, InputTranslation } from '../../services/inputs.service';
 import { AuthService } from '../../services/auth.service';
 import { MarkdownPipe } from '../../pipes/markdown.pipe';
 
@@ -133,6 +133,12 @@ const QUILL_MODULES = {
                           <mat-icon>edit</mat-icon> Reprendre ce brouillon
                         </button>
                       }
+                      @if (inp.authorUserId !== auth.currentUser()?.id && allowedTypes().includes('comment')) {
+                        <button mat-stroked-button color="accent" style="margin-top:6px; font-size:12px"
+                                (click)="commentOn(inp)">
+                          <mat-icon>chat</mat-icon> Commenter
+                        </button>
+                      }
                     </div>
                   }
                 </div>
@@ -141,7 +147,7 @@ const QUILL_MODULES = {
           }
         </div>
 
-        <!-- Colonne droite : formulaire -->
+        <!-- Colonne droite : formulaire + section EN -->
         <div>
           <mat-card>
             <mat-card-header>
@@ -325,6 +331,155 @@ const QUILL_MODULES = {
               }
             </mat-card-content>
           </mat-card>
+
+          <!-- Section traduction EN (disponible dès qu'un brouillon existe) -->
+          @if (draftId()) {
+            <mat-card style="margin-top:16px">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>translate</mat-icon>
+                <mat-card-title>English translation (optional)</mat-card-title>
+                <mat-card-subtitle>EN version — plain text, no formatting required</mat-card-subtitle>
+              </mat-card-header>
+              <mat-card-content style="display:flex; flex-direction:column; gap:12px; padding-top:8px">
+
+                <!-- Bouton Traduire -->
+                <div style="display:flex; justify-content:flex-end">
+                  <button mat-stroked-button type="button" [disabled]="translating()" (click)="autoTranslate()"
+                          matTooltip="Traduit tous les champs via IA (écrase la traduction existante)">
+                    @if (translating()) {
+                      <mat-spinner diameter="16" style="display:inline-block; margin-right:6px"></mat-spinner> Traduction…
+                    } @else {
+                      <ng-container><mat-icon>auto_awesome</mat-icon> Traduire</ng-container>
+                    }
+                  </button>
+                </div>
+
+                @if (selectedType() !== 'comment') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">
+                      Title (EN) <span style="color:#888; font-weight:400; text-transform:none">— FR : {{ form.get('title')?.value }}</span>
+                    </div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().title ?? ''"
+                           (input)="setTrans('title', $any($event.target).value)"
+                           placeholder="Title in English…" />
+                  </div>
+                }
+
+                @if (selectedType() === 'activity' || selectedType() === 'comment') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Content (EN)</div>
+                    <textarea rows="4"
+                              style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                              [value]="translationDraft().content ?? ''"
+                              (input)="setTrans('content', $any($event.target).value)"
+                              placeholder="Content in English…"></textarea>
+                  </div>
+                }
+
+                @if (selectedType() === 'activity') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Inputs / means (EN)</div>
+                    <textarea rows="2" style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                              [value]="translationDraft().means ?? ''"
+                              (input)="setTrans('means', $any($event.target).value)"
+                              placeholder="Inputs in English…"></textarea>
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Outputs (EN)</div>
+                    <textarea rows="2" style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                              [value]="translationDraft().output ?? ''"
+                              (input)="setTrans('output', $any($event.target).value)"
+                              placeholder="Outputs in English…"></textarea>
+                  </div>
+                }
+
+                @if (selectedType() === 'milestone') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Deliverable (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().deliverable ?? ''"
+                           (input)="setTrans('deliverable', $any($event.target).value)"
+                           placeholder="Deliverable in English…" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Verification method (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().verificationMethod ?? ''"
+                           (input)="setTrans('verificationMethod', $any($event.target).value)"
+                           placeholder="Verification method in English…" />
+                  </div>
+                }
+
+                @if (selectedType() === 'indicator') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Target value (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().targetValue ?? ''"
+                           (input)="setTrans('targetValue', $any($event.target).value)"
+                           placeholder="Target value in English…" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Baseline (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().baseline ?? ''"
+                           (input)="setTrans('baseline', $any($event.target).value)"
+                           placeholder="Baseline in English…" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Data source (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().dataSource ?? ''"
+                           (input)="setTrans('dataSource', $any($event.target).value)"
+                           placeholder="Data source in English…" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Frequency (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().frequency ?? ''"
+                           (input)="setTrans('frequency', $any($event.target).value)"
+                           placeholder="Frequency in English…" />
+                  </div>
+                }
+
+                @if (selectedType() === 'risk') {
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Likelihood (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().likelihood ?? ''"
+                           (input)="setTrans('likelihood', $any($event.target).value)"
+                           placeholder="e.g. Low / Medium / High" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Impact (EN)</div>
+                    <input style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box"
+                           [value]="translationDraft().impact ?? ''"
+                           (input)="setTrans('impact', $any($event.target).value)"
+                           placeholder="e.g. Low / Medium / High" />
+                  </div>
+                  <div>
+                    <div style="font-size:11px; font-weight:700; color:#1565c0; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px">Mitigation measure (EN)</div>
+                    <textarea rows="3" style="width:100%; padding:8px 10px; border:1px solid #ccc; border-radius:4px; font-size:13px; box-sizing:border-box; resize:vertical"
+                              [value]="translationDraft().mitigation ?? ''"
+                              (input)="setTrans('mitigation', $any($event.target).value)"
+                              placeholder="Mitigation measure in English…"></textarea>
+                  </div>
+                }
+
+                <div style="display:flex; justify-content:flex-end; padding-top:4px">
+                  <button mat-stroked-button type="button" [disabled]="savingTranslation()" (click)="saveTranslation()">
+                    @if (savingTranslation()) {
+                      <mat-spinner diameter="16"></mat-spinner>
+                    } @else {
+                      <ng-container><mat-icon>save</mat-icon> Save EN</ng-container>
+                    }
+                  </button>
+                </div>
+
+              </mat-card-content>
+            </mat-card>
+          }
+
         </div>
       </div>
     </div>
@@ -332,6 +487,18 @@ const QUILL_MODULES = {
   styles: [``],
 })
 export class ContributeComponent implements OnInit, OnDestroy {
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent) {
+    if (this.hasUnsavedChanges()) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  }
+
+  hasUnsavedChanges(): boolean {
+    return !!this._draftId() && !this.submitting();
+  }
   private route = inject(ActivatedRoute);
   private sectionsService = inject(SectionsService);
   private inputsService = inject(InputsService);
@@ -353,6 +520,9 @@ export class ContributeComponent implements OnInit, OnDestroy {
   private _draftId = signal<string | null>(null);
   draftId = this._draftId.asReadonly();
   private isSaving = false;
+  translationDraft = signal<Partial<InputTranslation>>({});
+  savingTranslation = signal(false);
+  translating = signal(false);
 
   selectedSectionId = '';
 
@@ -429,6 +599,7 @@ export class ContributeComponent implements OnInit, OnDestroy {
     this._draftId.set(null);
     this.isSaving = false;
     this.autosaveLabel.set('');
+    this.translationDraft.set({});
 
     const defaultType = section?.inputTypes?.[0] as InputType ?? 'comment';
     this.form.patchValue({ type: defaultType }, { emitEvent: false });
@@ -447,8 +618,44 @@ export class ContributeComponent implements OnInit, OnDestroy {
     this.inputsService.getAll({ sectionId }).subscribe(inputs => this.existingInputs.set(inputs));
   }
 
+  setTrans(field: string, value: string) {
+    this.translationDraft.update(d => ({ ...d, [field]: value }));
+  }
+
+  autoTranslate() {
+    if (!this._draftId()) return;
+    this.translating.set(true);
+    this.inputsService.autoTranslate(this._draftId()!).subscribe({
+      next: (t) => {
+        this.translating.set(false);
+        this.translationDraft.set({ ...t });
+        this.snackBar.open('Traduction EN générée', 'OK', { duration: 2500 });
+      },
+      error: (e) => {
+        this.translating.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur LLM', 'Fermer', { duration: 5000 });
+      },
+    });
+  }
+
+  saveTranslation() {
+    if (!this._draftId()) return;
+    this.savingTranslation.set(true);
+    this.inputsService.upsertTranslation(this._draftId()!, { ...this.translationDraft() }).subscribe({
+      next: () => {
+        this.savingTranslation.set(false);
+        this.snackBar.open('Traduction EN enregistrée', 'OK', { duration: 2000 });
+      },
+      error: (e) => {
+        this.savingTranslation.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur', 'Fermer', { duration: 4000 });
+      },
+    });
+  }
+
   resumeDraft(inp: Input) {
     this._draftId.set(inp.id);
+    this.translationDraft.set(inp.translation ? { ...inp.translation } : {});
     this.form.patchValue({
       type: inp.type,
       title: inp.title ?? '',
@@ -590,10 +797,23 @@ export class ContributeComponent implements OnInit, OnDestroy {
     };
   }
 
+  commentOn(inp: Input) {
+    this._draftId.set(null);
+    this.isSaving = false;
+    this.autosaveLabel.set('');
+    this.translationDraft.set({});
+    this.form.reset({
+      type: 'comment',
+      targetRef: inp.id,
+    }, { emitEvent: false });
+    this.snackBar.open(`Vous commentez la contribution de ${inp.author.email}`, 'OK', { duration: 2500 });
+  }
+
   resetForm() {
     this._draftId.set(null);
     this.isSaving = false;
     this.autosaveLabel.set('');
+    this.translationDraft.set({});
     const defaultType = this.currentSection()?.inputTypes?.[0] as InputType ?? 'comment';
     this.form.reset({ type: defaultType }, { emitEvent: false });
   }
