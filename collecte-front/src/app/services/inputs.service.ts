@@ -155,6 +155,18 @@ export class InputsService {
     return this.http.delete(`${this.base}/${id}`);
   }
 
+  downloadImportTemplate() {
+    return this.http.get(`${this.base}/import/template`, { responseType: 'blob' });
+  }
+
+  importExcel(file: File) {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<{ total: number; imported: number; errors: { sheet: string; row: number; error: string }[] }>(
+      `${this.base}/import`, form,
+    );
+  }
+
   downloadDocx(sectionId?: string, lang: 'fr' | 'en' = 'fr') {
     const url = sectionId
       ? `${environment.apiUrl}/export/section/${sectionId}/docx`

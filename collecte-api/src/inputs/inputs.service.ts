@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateInputDto } from './dto/create-input.dto';
 import { UpdateInputDto, UpdateStatusDto, UpdatePmoDto, UpsertTranslationDto } from './dto/update-input.dto';
 import { TranslationLlmService } from '../translation/translation-llm.service';
+import * as ExcelJS from 'exceljs';
 
 const INPUT_INCLUDE = {
   author: { select: { id: true, email: true, entityId: true } },
@@ -438,6 +439,208 @@ export class InputsService {
       create: { inputId: id, ...translated },
       update: translated,
     });
+  }
+
+  // ── Import Excel ──────────────────────────────────────────────────────────
+
+  private static readonly IMPORT_COLS = [
+    { header: 'Entité',                  key: 'entity',               width: 12 },
+    { header: 'Type',                    key: 'type',                 width: 14 },
+    { header: 'Titre',                   key: 'title',                width: 30 },
+    { header: 'Contenu / Description',   key: 'content',              width: 40 },
+    { header: 'Intrant',                 key: 'means',                width: 25 },
+    { header: 'Extrant',                 key: 'output',               width: 25 },
+    { header: 'Livrable',               key: 'deliverable',           width: 25 },
+    { header: 'Méthode de vérification', key: 'verificationMethod',   width: 30 },
+    { header: 'Valeur cible',            key: 'targetValue',          width: 14 },
+    { header: 'Base de référence',       key: 'baseline',             width: 20 },
+    { header: 'Source de données',       key: 'dataSource',           width: 20 },
+    { header: 'Fréquence',              key: 'frequency',             width: 14 },
+    { header: 'Échéance',               key: 'dueMonth',              width: 12 },
+    { header: 'Probabilité',            key: 'likelihood',            width: 14 },
+    { header: 'Impact',                 key: 'impact',                width: 12 },
+    { header: 'Atténuation',            key: 'mitigation',            width: 30 },
+    { header: 'Montant proposé',        key: 'paymentAmountProposed', width: 18 },
+  ] as const;
+
+  async generateImportTemplate(): Promise<Buffer> {
+    const sections = await this.prisma.referenceSection.findMany({ orderBy: { ordre: 'asc' } });
+    const entities = await this.prisma.entity.findMany({ orderBy: { code: 'asc' } });
+    const entityCodes = entities.map(e => e.code);
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Collecte NPSP-CI';
+    workbook.created = new Date();
+
+    for (const section of sections) {
+      const sheetName = section.titre.substring(0, 31);
+      const sheet = workbook.addWorksheet(sheetName);
+
+      sheet.columns = InputsService.IMPORT_COLS.map(c => ({ ...c }));
+
+      // En-tête coloré
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1565C0' } };
+      headerRow.alignment = { vertical: 'middle' };
+      headerRow.height = 20;
+
+      // Ligne exemple grisée
+      const exRow = sheet.addRow({
+        entity: entityCodes[0] ?? 'CODE',
+        type: 'activité',
+        title: 'Exemple — supprimer cette ligne avant import',
+        content: 'Description de l\'activité',
+        means: 'Intrant exemple',
+        output: 'Extrant exemple',
+      });
+      exRow.font = { italic: true, color: { argb: 'FF9E9E9E' } };
+      exRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
+
+      // Validation dropdown Type (colonne 2) à partir de la ligne 2
+      const typeFormula = '"activité,indicateur,jalon,risque"';
+      for (let r = 2; r <= 500; r++) {
+        sheet.getCell(r, 2).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [typeFormula],
+          showErrorMessage: true,
+          errorTitle: 'Type invalide',
+          error: 'Choisissez : activité, indicateur, jalon ou risque',
+        };
+        if (entityCodes.length > 0) {
+          sheet.getCell(r, 1).dataValidation = {
+            type: 'list',
+            allowBlank: false,
+            formulae: [`"${entityCodes.join(',')}"`],
+            showErrorMessage: true,
+            errorTitle: 'Entité invalide',
+            error: `Codes valides : ${entityCodes.join(', ')}`,
+          };
+        }
+      }
+    }
+
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  async importFromExcel(buffer: Buffer, user: AuthUser): Promise<{
+    total: number;
+    imported: number;
+    errors: { sheet: string; row: number; error: string }[];
+  }> {
+    if (!isSuperAdmin(user)) throw new ForbiddenException('Réservé au Super Admin.');
+
+    const sections = await this.prisma.referenceSection.findMany();
+    const entities  = await this.prisma.entity.findMany();
+    const entityByCode = new Map(entities.map(e => [e.code.toLowerCase(), e]));
+    const sectionByName = new Map(
+      sections.map(s => [s.titre.substring(0, 31).toLowerCase(), s]),
+    );
+
+    const TYPE_MAP: Record<string, string> = {
+      'activité': 'activity', 'activite': 'activity', 'activity': 'activity',
+      'indicateur': 'indicator', 'indicator': 'indicator',
+      'jalon': 'milestone', 'milestone': 'milestone',
+      'risque': 'risk', 'risk': 'risk',
+    };
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+
+    let total = 0;
+    let imported = 0;
+    const errors: { sheet: string; row: number; error: string }[] = [];
+
+    for (const sheet of workbook.worksheets) {
+      const section = sectionByName.get(sheet.name.substring(0, 31).toLowerCase());
+      if (!section) {
+        errors.push({ sheet: sheet.name, row: 0, error: `Axe "${sheet.name}" non trouvé dans le référentiel` });
+        continue;
+      }
+
+      const rows: ExcelJS.Row[] = [];
+      sheet.eachRow({ includeEmpty: false }, (row, idx) => { if (idx > 1) rows.push(row); });
+
+      for (const row of rows) {
+        const rowNum = row.number;
+        const cell = (c: number) => {
+          const v = row.getCell(c).value;
+          if (v === null || v === undefined) return '';
+          if (typeof v === 'object' && 'text' in (v as any)) return String((v as any).text);
+          return String(v).trim();
+        };
+
+        const entityCode = cell(1);
+        const typeRaw    = cell(2);
+        const title      = cell(3);
+        const content    = cell(4);
+
+        // Ignorer lignes vides et ligne exemple
+        if (!entityCode && !typeRaw && !title && !content) continue;
+        if (title.toLowerCase().includes('exemple — supprimer')) continue;
+
+        total++;
+
+        const entity = entityByCode.get(entityCode.toLowerCase());
+        if (!entity) {
+          errors.push({ sheet: sheet.name, row: rowNum, error: `Entité "${entityCode}" inconnue` });
+          continue;
+        }
+
+        const type = TYPE_MAP[typeRaw.toLowerCase()];
+        if (!type) {
+          errors.push({ sheet: sheet.name, row: rowNum, error: `Type "${typeRaw}" invalide (activité | indicateur | jalon | risque)` });
+          continue;
+        }
+
+        const payload: any = {
+          referenceSectionId: section.id,
+          entityId: entity.id,
+          authorUserId: user.userId,
+          type,
+          content: content || '',
+          ...(title      && { title }),
+          ...(cell(5)    && { means: cell(5) }),
+          ...(cell(6)    && { output: cell(6) }),
+          ...(cell(7)    && { deliverable: cell(7) }),
+          ...(cell(8)    && { verificationMethod: cell(8) }),
+          ...(cell(9)    && { targetValue: cell(9) }),
+          ...(cell(10)   && { baseline: cell(10) }),
+          ...(cell(11)   && { dataSource: cell(11) }),
+          ...(cell(12)   && { frequency: cell(12) }),
+          ...(cell(13)   && { dueMonth: cell(13) }),
+          ...(cell(14)   && { likelihood: cell(14) }),
+          ...(cell(15)   && { impact: cell(15) }),
+          ...(cell(16)   && { mitigation: cell(16) }),
+          ...(cell(17)   && { paymentAmountProposed: cell(17) }),
+        };
+
+        try {
+          const created = await this.prisma.input.create({
+            data: payload as any,
+            select: { id: true },
+          });
+          await this.prisma.input.update({
+            where: { id: created.id },
+            data: { status: 'submitted' } as any,
+          });
+          await this.prisma.inputRevision.create({
+            data: {
+              inputId: created.id,
+              editorUserId: user.userId,
+              changeType: 'imported',
+              snapshot: payload as any,
+            },
+          });
+          imported++;
+        } catch (e: any) {
+          errors.push({ sheet: sheet.name, row: rowNum, error: e.message ?? 'Erreur création' });
+        }
+      }
+    }
+
+    return { total, imported, errors };
   }
 
   async getStats() {
