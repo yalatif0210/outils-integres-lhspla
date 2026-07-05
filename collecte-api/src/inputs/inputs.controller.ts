@@ -1,7 +1,10 @@
 import {
   Controller, Get, Post, Patch, Delete,
   Param, Body, Query, UseGuards, Request, ForbiddenException,
+  UseInterceptors, UploadedFile, Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { InputsService } from './inputs.service';
 import { CreateInputDto } from './dto/create-input.dto';
@@ -43,6 +46,29 @@ export class InputsController {
   @Get('stats')
   getStats() {
     return this.inputsService.getStats();
+  }
+
+  @Get('import/template')
+  async downloadImportTemplate(@Request() req: any, @Res() res: Response) {
+    if (!req.user.roles?.includes('super_admin')) {
+      throw new ForbiddenException('Réservé au Super Admin.');
+    }
+    const buffer = await this.inputsService.generateImportTemplate();
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="template-import-contributions.xlsx"',
+    });
+    res.send(buffer);
+  }
+
+  @Post('import')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  importExcel(@UploadedFile() file: any, @Request() req: any) {
+    if (!req.user.roles?.includes('super_admin')) {
+      throw new ForbiddenException('Réservé au Super Admin.');
+    }
+    if (!file) throw new ForbiddenException('Fichier manquant.');
+    return this.inputsService.importFromExcel(file.buffer, req.user);
   }
 
   @Get(':id')

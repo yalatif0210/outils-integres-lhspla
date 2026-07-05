@@ -53,6 +53,19 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'comments',
             <a mat-stroked-button routerLink="/trash" style="color:#c62828">
               <mat-icon>delete_sweep</mat-icon> Corbeille (SA)
             </a>
+            <button mat-stroked-button (click)="downloadImportTemplate()" matTooltip="Télécharger le modèle Excel à remplir">
+              <mat-icon>download</mat-icon> Modèle import
+            </button>
+            <label mat-stroked-button style="cursor:pointer; display:inline-flex; align-items:center; gap:4px"
+                   matTooltip="Importer un fichier Excel pré-rempli">
+              @if (importing()) {
+                <mat-spinner diameter="16" style="display:inline-block"></mat-spinner>
+              } @else {
+                <mat-icon>upload_file</mat-icon>
+              }
+              Importer Excel
+              <input type="file" accept=".xlsx,.xls" style="display:none" (change)="onImportFile($event)" [disabled]="importing()">
+            </label>
           }
           @if (auth.isSuperAdmin() || auth.isPmo() || auth.isCop()) {
             <button mat-stroked-button (click)="downloadGlobalDocx('fr')" [disabled]="downloading()">
@@ -120,6 +133,37 @@ const COL_ORDER: ColKey[] = ['section', 'entity', 'type', 'content', 'comments',
           <span style="font-size:13px; color:#555">{{ filtered().length }} résultat(s)</span>
         </mat-card-content>
       </mat-card>
+
+      <!-- Rapport import Excel (SA) -->
+      @if (importReport()) {
+        <mat-card style="margin-bottom:16px"
+                  [style.border-left]="'4px solid ' + (importReport()!.errors.length === 0 ? '#43a047' : '#f57c00')">
+          <mat-card-content style="padding:12px">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+              <span style="font-weight:600">
+                Rapport import — {{ importReport()!.imported }} / {{ importReport()!.total }} ligne(s) importée(s)
+              </span>
+              <button mat-icon-button (click)="importReport.set(null)"><mat-icon>close</mat-icon></button>
+            </div>
+            @if (importReport()!.errors.length > 0) {
+              <div style="font-size:12px; color:#c62828; font-weight:600; margin-bottom:4px">
+                {{ importReport()!.errors.length }} erreur(s) :
+              </div>
+              <div style="max-height:160px; overflow-y:auto">
+                @for (err of importReport()!.errors; track $index) {
+                  <div style="font-size:12px; padding:3px 0; border-bottom:1px solid #f0f0f0; color:#555">
+                    <strong>{{ err.sheet }}</strong>
+                    @if (err.row > 0) { <span> — ligne {{ err.row }}</span> }
+                    <span> : {{ err.error }}</span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <span style="font-size:12px; color:#43a047">Toutes les lignes ont été importées avec succès.</span>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
 
       <!-- Compteurs par entité -->
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px">
@@ -946,6 +990,8 @@ export class ConsolidationComponent implements OnInit {
   sections = signal<any[]>([]);
   loading = signal(true);
   downloading = signal(false);
+  importing = signal(false);
+  importReport = signal<{ total: number; imported: number; errors: { sheet: string; row: number; error: string }[] } | null>(null);
 
   filterSection = signal('');
   filterStatus = signal('');
@@ -1260,5 +1306,31 @@ export class ConsolidationComponent implements OnInit {
     if (this.selectedRow()?.id === updated.id) {
       this.selectedRow.set(updated);
     }
+  }
+
+  downloadImportTemplate() {
+    this.inputsService.downloadImportTemplate().subscribe({
+      next: (blob) => this.triggerDownload(blob as Blob, 'template-import-contributions.xlsx'),
+      error: () => this.snackBar.open('Erreur téléchargement modèle', 'Fermer', { duration: 4000 }),
+    });
+  }
+
+  onImportFile(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    this.importing.set(true);
+    this.importReport.set(null);
+    this.inputsService.importExcel(file).subscribe({
+      next: (report) => {
+        this.importing.set(false);
+        this.importReport.set(report);
+        if (report.imported > 0) this.loadInputs();
+      },
+      error: (e) => {
+        this.importing.set(false);
+        this.snackBar.open(e.error?.message ?? 'Erreur import', 'Fermer', { duration: 5000 });
+      },
+    });
+    (event.target as HTMLInputElement).value = '';
   }
 }
