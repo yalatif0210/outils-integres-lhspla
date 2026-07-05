@@ -117,7 +117,7 @@ export class ExportService {
         children.push(new Paragraph({ text: l.noInput }));
       } else {
         for (const input of section.inputs) {
-          const titleVal = getVal(input, 'title', lang);
+          const titleVal = stripHtml(getVal(input, 'title', lang));
           children.push(
             new Paragraph({
               children: [
@@ -138,7 +138,7 @@ export class ExportService {
           );
 
           const addField = (label: string, field: string) => {
-            const val = getVal(input, field, lang);
+            const val = stripHtml(getVal(input, field, lang));
             if (val) children.push(new Paragraph({ children: [new TextRun({ text: `${label} : `, bold: true }), new TextRun({ text: val })] }));
           };
 
