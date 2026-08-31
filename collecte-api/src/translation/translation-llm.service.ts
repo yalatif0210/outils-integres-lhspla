@@ -71,7 +71,7 @@ export class TranslationLlmService {
     const hasMistral   = !!process.env.MISTRAL_API_KEY;
 
     if (hasAnthropic) {
-      this.logger.log('[TranslationLLM] Using Claude (Anthropic)');
+      this.logger.log('[TranslationLLM] Using Claude (ANTHROPIC_API_KEY set)');
       try {
         return await this.callClaude(payload);
       } catch (err: any) {
@@ -80,7 +80,7 @@ export class TranslationLlmService {
       }
     }
     if (hasMistral) {
-      this.logger.log('[TranslationLLM] Using Mistral (fallback)');
+      this.logger.log('[TranslationLLM] Using Mistral (no Anthropic key)');
       try {
         return await this.callMistral(payload);
       } catch (err: any) {
