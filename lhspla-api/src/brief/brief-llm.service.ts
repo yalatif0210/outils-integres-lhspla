@@ -189,7 +189,7 @@ export class BriefLlmService {
     const hasMistral   = !!process.env.MISTRAL_API_KEY;
 
     if (hasAnthropic) {
-      this.logger.log('[BriefLLM] Utilisation de Claude (Anthropic)');
+      this.logger.log('[BriefLLM] Utilisation de Claude (ANTHROPIC_API_KEY présente)');
       try {
         return await this.callClaude(input);
       } catch (err: any) {
@@ -200,7 +200,7 @@ export class BriefLlmService {
       }
     }
     if (hasMistral) {
-      this.logger.log('[BriefLLM] Utilisation de Mistral (fallback)');
+      this.logger.log('[BriefLLM] Utilisation de Mistral (pas de clé Anthropic)');
       try {
         return await this.callMistral(input);
       } catch (err: any) {
@@ -215,7 +215,7 @@ export class BriefLlmService {
     );
   }
 
-  // ── Claude (primaire) ──────────────────────────────────────────────────────
+  // ── Claude — utilisé si ANTHROPIC_API_KEY est définie ──────────────────────
 
   private async callClaude(input: BriefLlmInput): Promise<BriefSections> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -249,14 +249,17 @@ export class BriefLlmService {
     return { ...parsed, llmModel: MODEL };
   }
 
-  // ── Mistral (fallback) ─────────────────────────────────────────────────────
+  // ── Mistral — utilisé si ANTHROPIC_API_KEY est absente ─────────────────────
+  // Modèle piloté par MISTRAL_MODEL (voir ADR 0001). Défaut : mistral-small-latest,
+  // seul modèle garanti dans le tier d'abonnement actuel. Ne pas remettre
+  // « mistral-large-latest » en dur → 403 tier_not_allowed.
 
   private async callMistral(input: BriefLlmInput): Promise<BriefSections> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Mistral } = require('@mistralai/mistralai');
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY, timeout: 120000 });
 
-    const MODEL   = 'mistral-large-latest';
+    const MODEL   = process.env.MISTRAL_MODEL || 'mistral-small-latest';
     const userMsg = buildUserMessage(input);
 
     const response = await client.chat.complete({

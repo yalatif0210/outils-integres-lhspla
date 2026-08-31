@@ -35,6 +35,7 @@ services:
       N8N_WEBHOOK_BASE_URL:   http://n8n:5678/webhook
       ANTHROPIC_API_KEY:      ${ANTHROPIC_API_KEY:-}
       MISTRAL_API_KEY:        ${MISTRAL_API_KEY:-}
+      MISTRAL_MODEL:          ${MISTRAL_MODEL:-mistral-small-latest}
       MAIL_HOST:              ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT:              ${MAIL_PORT:-587}
       MAIL_USER:              ${MAIL_USER:-}
