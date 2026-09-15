@@ -57,6 +57,31 @@ function parseJsonResponse(raw: string): Record<string, string> {
   return JSON.parse(match[0]);
 }
 
+// Extrait le status HTTP d'une SDKError Mistral en parsant le message
+// ("Status <code>\nBody: ..."), format stable déjà observé en prod.
+function httpStatusOf(err: any): number | undefined {
+  if (typeof err?.statusCode === 'number') return err.statusCode;
+  const m = /Status (\d+)/.exec(err?.message ?? '');
+  return m ? Number(m[1]) : undefined;
+}
+
+// Retry avec backoff exponentiel, uniquement sur 429 (rate limit Mistral).
+// MISTRAL_API_KEY est partagée avec lhspla-api (brief) : un pic ponctuel des
+// deux services sur le même compte est attendu sur un tier bas.
+async function withRateLimitRetry<T>(fn: () => Promise<T>, label: string, logger: Logger): Promise<T> {
+  const maxRetries = 3;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      if (httpStatusOf(err) !== 429 || attempt >= maxRetries) throw err;
+      const delayMs = 1000 * 2 ** attempt + Math.floor(Math.random() * 300);
+      logger.warn(`[${label}] 429 rate_limited — retry ${attempt + 1}/${maxRetries} dans ${delayMs}ms`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 @Injectable()
 export class TranslationLlmService {
   private readonly logger = new Logger(TranslationLlmService.name);
@@ -121,7 +146,7 @@ export class TranslationLlmService {
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY, timeout: 60000 });
     const MODEL = 'mistral-small-latest';
 
-    const response = await client.chat.complete({
+    const response = await withRateLimitRetry<any>(() => client.chat.complete({
       model: MODEL,
       responseFormat: { type: 'json_object' },
       messages: [
@@ -131,7 +156,7 @@ export class TranslationLlmService {
         },
         { role: 'user', content: buildUserMessage(payload) },
       ],
-    });
+    }), 'TranslationLLM', this.logger);
 
     const raw = response.choices?.[0]?.message?.content ?? '';
     this.logger.log(`[TranslationLLM] Mistral — tokens=${response.usage?.totalTokens ?? '?'}`);
