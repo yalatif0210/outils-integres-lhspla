@@ -146,7 +146,7 @@ export class TranslationLlmService {
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY, timeout: 60000 });
     const MODEL = 'mistral-small-latest';
 
-    const response = await withRateLimitRetry(() => client.chat.complete({
+    const response = await withRateLimitRetry<any>(() => client.chat.complete({
       model: MODEL,
       responseFormat: { type: 'json_object' },
       messages: [

@@ -288,7 +288,7 @@ export class BriefLlmService {
     const MODEL   = process.env.MISTRAL_MODEL || 'mistral-small-latest';
     const userMsg = buildUserMessage(input);
 
-    const response = await withRateLimitRetry(() => client.chat.complete({
+    const response = await withRateLimitRetry<any>(() => client.chat.complete({
       model: MODEL,
       responseFormat: { type: 'json_object' },
       messages: [
