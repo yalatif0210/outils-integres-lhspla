@@ -276,16 +276,18 @@ export class BriefLlmService {
   }
 
   // ── Mistral — utilisé si ANTHROPIC_API_KEY est absente ─────────────────────
-  // Modèle piloté par MISTRAL_MODEL (voir ADR 0001). Défaut : mistral-small-latest,
-  // seul modèle garanti dans le tier d'abonnement actuel. Ne pas remettre
-  // « mistral-large-latest » en dur → 403 tier_not_allowed.
+  // Modèle piloté par MISTRAL_MODEL (voir ADR 0001, mise à jour). Défaut :
+  // ministral-8b-2512 — mistral-small-latest est limité à 20 000 tokens/min
+  // sur ce tier (429 rate_limited dès un brief volumineux) ; ministral-8b a
+  // ~31x plus de marge (625 000 TPM), tier confirmé accessible (200 testé).
+  // Ne pas remettre « mistral-large-latest » en dur → 403 tier_not_allowed.
 
   private async callMistral(input: BriefLlmInput): Promise<BriefSections> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Mistral } = require('@mistralai/mistralai');
     const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY, timeout: 120000 });
 
-    const MODEL   = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+    const MODEL   = process.env.MISTRAL_MODEL || 'ministral-8b-2512';
     const userMsg = buildUserMessage(input);
 
     const response = await withRateLimitRetry<any>(() => client.chat.complete({
